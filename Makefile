@@ -1,4 +1,4 @@
-.PHONY: install sync lint type test dev console infra down help
+.PHONY: install sync lint type test check start stop status infra down help
 
 install: ## Install all dependencies
 	uv sync --dev
@@ -18,11 +18,17 @@ test: ## Run tests
 
 check: lint type test ## Full check: lint + type + test
 
-dev: ## Run in dev mode (requires LiveKit server)
-	uv run clawhisper run --mode dev
+start: ## Start the voice daemon (foreground)
+	uv run eclaw start
 
-console: ## Run in console mode (local mic/speaker)
-	uv run clawhisper run --mode console
+stop: ## Stop the voice daemon
+	uv run eclaw stop
+
+status: ## Show daemon status
+	uv run eclaw status
+
+info: ## Show current configuration
+	uv run eclaw info
 
 infra: ## Start STT + TTS infrastructure
 	docker compose -f compose.infra.yml up -d

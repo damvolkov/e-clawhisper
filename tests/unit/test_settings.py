@@ -1,52 +1,80 @@
-"""Tests for settings."""
+"""Tests for settings and config models."""
 
 from __future__ import annotations
 
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+
 import pytest
 
-from e_clawhisper.core.settings import Settings
+from e_clawhisper.shared.settings import (
+    AgentBackend,
+    AppConfig,
+    STTBackend,
+    Settings,
+    TTSBackend,
+    VADBackend,
+)
 
 
-##### DEFAULTS #####
-
-
-def test_settings_defaults() -> None:
-    s = Settings(AGENT_NAME="test", AGENT_ID="id-1", _env_file=None)
-    assert s.AGENT_NAME == "test"
-    assert s.CHANNEL_BACKEND == "openfang"
-    assert s.STT_PORT == 9090
-    assert s.TTS_PORT == 10200
-    assert s.CONVERSATION_TIMEOUT == 30.0
-
-
-##### COMPUTED URLS #####
+##### ENUMS #####
 
 
 @pytest.mark.parametrize(
-    ("host", "port", "expected"),
+    ("enum_cls", "member", "value"),
     [
-        ("localhost", 4200, "http://localhost:4200"),
-        ("10.0.0.5", 8080, "http://10.0.0.5:8080"),
+        (AgentBackend, AgentBackend.OPENFANG, "openfang"),
+        (STTBackend, STTBackend.WHISPERLIVE, "whisperlive"),
+        (TTSBackend, TTSBackend.PIPER, "piper"),
+        (VADBackend, VADBackend.TEN_VAD, "ten_vad"),
     ],
-    ids=["localhost", "custom-ip"],
+    ids=["agent", "stt", "tts", "vad"],
 )
-def test_settings_openfang_base_url(host: str, port: int, expected: str) -> None:
-    s = Settings(OPENFANG_HOST=host, OPENFANG_PORT=port, _env_file=None)
-    assert s.openfang_base_url == expected
+def test_enum_values(enum_cls: type, member: object, value: str) -> None:
+    assert member == value
 
 
-def test_settings_stt_ws_url() -> None:
-    s = Settings(STT_HOST="stt-host", STT_PORT=9999, _env_file=None)
-    assert s.stt_ws_url == "ws://stt-host:9999"
+##### SETTINGS #####
 
 
-def test_settings_dev_defaults() -> None:
-    s = Settings(ENVIRONMENT="DEV", _env_file=None)
+def test_settings_defaults() -> None:
+    s = Settings(_env_file=None)
+    assert s.ENVIRONMENT == "DEV"
+    assert s.SOCKET_PATH == "/tmp/e-claw.sock"
     assert s.is_dev is True
-    assert s.log_level == "debug"
 
 
-def test_settings_prod() -> None:
-    s = Settings(ENVIRONMENT="PROD", _env_file=None)
-    assert s.is_dev is False
-    assert s.log_level == "info"
+##### APPCONFIG DEFAULTS #####
+
+
+def test_app_config_defaults() -> None:
+    cfg = AppConfig()
+    assert cfg.agent.name == "damien"
+    assert cfg.agent.backend == AgentBackend.OPENFANG
+    assert cfg.stt.backend == STTBackend.WHISPERLIVE
+    assert cfg.tts.backend == TTSBackend.PIPER
+    assert cfg.vad.threshold == 0.5
+    assert cfg.audio.sample_rate == 16000
+
+
+##### YAML LOADING #####
+
+
+def test_app_config_from_yaml() -> None:
+    yaml_content = """
+agent:
+  name: testbot
+  backend: openfang
+stt:
+  backend: whisperlive
+  whisperlive:
+    port: 9999
+"""
+    with NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        f.write(yaml_content)
+        f.flush()
+        cfg = AppConfig.from_yaml(Path(f.name))
+
+    assert cfg.agent.name == "testbot"
+    assert cfg.stt.whisperlive.port == 9999
+    assert cfg.tts.backend == TTSBackend.PIPER

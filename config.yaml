@@ -1,0 +1,35 @@
+agent:
+  name: damien
+  backend: openfang
+
+backends:
+  openfang:
+    host: 127.0.0.1
+    port: 4200
+    timeout: 30.0
+
+stt:
+  backend: whisperlive
+  whisperlive:
+    host: localhost
+    port: 9090
+    model: small
+    language: en
+
+tts:
+  backend: piper
+  piper:
+    host: localhost
+    port: 10200
+    voice: en_US-lessac-medium
+    sample_rate: 22050
+
+vad:
+  backend: ten_vad
+  threshold: 0.5
+  silence_duration: 1.5
+
+audio:
+  sample_rate: 16000
+  channels: 1
+  chunk_size: 512

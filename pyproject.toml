@@ -5,29 +5,32 @@ build-backend = "hatchling.build"
 [project]
 name = "e-clawhisper"
 dynamic = ["version"]
-description = "Always-on voice channel: wake-word detection → STT → AgentOS → TTS bridge"
+description = "Always-on voice daemon: wake-word → STT → AgentOS → TTS desktop bridge"
 readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "MIT" }
 authors = [{ name = "Eager", email = "dev@eager.dev" }]
-keywords = ["voice", "stt", "tts", "vad", "wake-word", "livekit", "agents", "openfang"]
+keywords = ["voice", "stt", "tts", "vad", "wake-word", "daemon", "openfang", "ten-vad"]
 
 dependencies = [
-    "livekit-agents[silero]~=1.3",
-    "httpx>=0.28.1",
+    "cyclopts>=3.6.0",
+    "ten-vad",
     "websockets>=12.0",
+    "wyoming>=1.8.0",
+    "sounddevice>=0.5.0",
+    "numpy>=2.0.0",
+    "orjson>=3.10.0",
     "pydantic>=2.11.0",
     "pydantic-settings>=2.10.0",
-    "orjson>=3.10.0",
     "structlog>=25.0.0",
-    "wyoming>=1.8.0",
-    "typer>=0.16.0",
+    "httpx>=0.28.1",
+    "pyyaml>=6.0.0",
+    "aiofiles>=25.0.0",
     "rich>=14.0.0",
-    "numpy>=2.0.0",
 ]
 
 [project.scripts]
-clawhisper = "e_clawhisper.main:cli"
+eclaw = "e_clawhisper.main:main"
 
 [dependency-groups]
 dev = [
@@ -75,3 +78,6 @@ root = ["./src/e_clawhisper"]
 [tool.ty.rules]
 possibly-unresolved-reference = "error"
 unresolved-import = "error"
+
+[tool.uv.sources]
+ten-vad = { git = "https://github.com/TEN-framework/ten-vad.git" }

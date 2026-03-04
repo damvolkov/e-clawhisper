@@ -1,4 +1,4 @@
-"""Structured logging with icon prefixes."""
+"""Structured logging."""
 
 from __future__ import annotations
 
@@ -9,38 +9,36 @@ import structlog
 
 
 class LogIcon(StrEnum):
-    """Log icon identifiers."""
-
     START = auto()
     STOP = auto()
     AGENT = auto()
-    CHAT = auto()
-    ERROR = auto()
     WAKE = auto()
     STT = auto()
     TTS = auto()
-    CHANNEL = auto()
-    PROCESSING = auto()
-    COMPLETE = auto()
+    VAD = auto()
+    PIPE = auto()
+    IPC = auto()
+    ERROR = auto()
+    OK = auto()
 
 
 _ICONS: dict[LogIcon, str] = {
     LogIcon.START: "[>>]",
     LogIcon.STOP: "[||]",
     LogIcon.AGENT: "[AG]",
-    LogIcon.CHAT: "[CH]",
-    LogIcon.ERROR: "[!!]",
     LogIcon.WAKE: "[WK]",
     LogIcon.STT: "[ST]",
     LogIcon.TTS: "[TS]",
-    LogIcon.CHANNEL: "[CN]",
-    LogIcon.PROCESSING: "[..]",
-    LogIcon.COMPLETE: "[OK]",
+    LogIcon.VAD: "[VD]",
+    LogIcon.PIPE: "[PI]",
+    LogIcon.IPC: "[IP]",
+    LogIcon.ERROR: "[!!]",
+    LogIcon.OK: "[OK]",
 }
 
 
 class IconLogger:
-    """Logger wrapper with icon-based prefixes."""
+    """Logger with icon prefixes."""
 
     def __init__(self, name: str) -> None:
         self._log = structlog.get_logger(name)
@@ -62,7 +60,6 @@ class IconLogger:
 
 
 def configure_logging(level: str = "info") -> None:
-    """Configure structlog for dev/prod."""
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
@@ -73,7 +70,7 @@ def configure_logging(level: str = "info") -> None:
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
     )
-    logging.basicConfig(level=getattr(logging, level.upper()), format="%(message)s")
+    logging.basicConfig(level=getattr(logging, level.upper(), logging.INFO), format="%(message)s")
 
 
-logger = IconLogger("e_clawhisper")
+logger = IconLogger("eclaw")

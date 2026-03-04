@@ -1,1 +1,1 @@
-"""e-clawhisper: always-on voice channel bridge."""
+"""e-clawhisper: always-on voice channel daemon."""
