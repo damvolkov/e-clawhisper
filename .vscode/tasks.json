@@ -1,0 +1,35 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "eclaw: ensure-stt",
+      "type": "shell",
+      "command": "nc -z localhost ${STT_PORT:-9090} 2>/dev/null && echo '✓ STT already up' || (echo '⏳ Starting STT...' && docker compose -f compose.infra.yml up -d stt && for i in $(seq 1 90); do nc -z localhost ${STT_PORT:-9090} 2>/dev/null && echo '✓ STT ready' && exit 0; sleep 1; done; echo '✗ STT timeout' && exit 1)",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "showReuseMessage": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "eclaw: ensure-tts",
+      "type": "shell",
+      "command": "nc -z localhost ${TTS_PORT:-10200} 2>/dev/null && echo '✓ TTS already up' || (echo '⏳ Starting TTS...' && docker compose -f compose.infra.yml up -d tts && for i in $(seq 1 60); do nc -z localhost ${TTS_PORT:-10200} 2>/dev/null && echo '✓ TTS ready' && exit 0; sleep 1; done; echo '✗ TTS timeout' && exit 1)",
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "showReuseMessage": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "eclaw: infra-ready",
+      "dependsOn": ["eclaw: ensure-stt", "eclaw: ensure-tts"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    }
+  ]
+}

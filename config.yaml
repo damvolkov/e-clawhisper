@@ -1,3 +1,5 @@
+language: es
+
 agent:
   name: damien
   backend: openfang
@@ -14,22 +16,22 @@ stt:
     host: localhost
     port: 9090
     model: small
-    language: en
 
 tts:
   backend: piper
   piper:
     host: localhost
     port: 10200
-    voice: en_US-lessac-medium
     sample_rate: 22050
 
 vad:
   backend: ten_vad
   threshold: 0.5
   silence_duration: 1.5
+  min_recording_time: 1.0
 
 audio:
   sample_rate: 16000
   channels: 1
   chunk_size: 512
+  pre_roll_seconds: 2.0

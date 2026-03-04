@@ -7,6 +7,8 @@ from enum import StrEnum, auto
 
 import structlog
 
+##### ENUMS #####
+
 
 class LogIcon(StrEnum):
     START = auto()
@@ -21,6 +23,8 @@ class LogIcon(StrEnum):
     ERROR = auto()
     OK = auto()
 
+
+##### ICONS #####
 
 _ICONS: dict[LogIcon, str] = {
     LogIcon.START: "[>>]",
@@ -37,26 +41,35 @@ _ICONS: dict[LogIcon, str] = {
 }
 
 
+##### LOGGER #####
+
+
 class IconLogger:
     """Logger with icon prefixes."""
+
+    __slots__ = ("_log",)
 
     def __init__(self, name: str) -> None:
         self._log = structlog.get_logger(name)
 
-    def _fmt(self, msg: str, icon: LogIcon | None) -> str:
+    @staticmethod
+    def format_icon(msg: str, icon: LogIcon | None) -> str:
         return f"{_ICONS[icon]} {msg}" if icon else msg
 
     def info(self, msg: str, *args: object, icon: LogIcon | None = None) -> None:
-        self._log.info(self._fmt(msg, icon), *args)
+        self._log.info(self.format_icon(msg, icon), *args)
 
     def debug(self, msg: str, *args: object, icon: LogIcon | None = None) -> None:
-        self._log.debug(self._fmt(msg, icon), *args)
+        self._log.debug(self.format_icon(msg, icon), *args)
 
     def warning(self, msg: str, *args: object, icon: LogIcon | None = None) -> None:
-        self._log.warning(self._fmt(msg, icon), *args)
+        self._log.warning(self.format_icon(msg, icon), *args)
 
     def error(self, msg: str, *args: object, icon: LogIcon | None = None) -> None:
-        self._log.error(self._fmt(msg, icon), *args)
+        self._log.error(self.format_icon(msg, icon), *args)
+
+
+##### CONFIGURE #####
 
 
 def configure_logging(level: str = "info") -> None:
@@ -64,6 +77,9 @@ def configure_logging(level: str = "info") -> None:
         processors=[
             structlog.contextvars.merge_contextvars,
             structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.UnicodeDecoder(),
             structlog.dev.ConsoleRenderer(),
         ],
         wrapper_class=structlog.stdlib.BoundLogger,
@@ -71,6 +87,9 @@ def configure_logging(level: str = "info") -> None:
         logger_factory=structlog.stdlib.LoggerFactory(),
     )
     logging.basicConfig(level=getattr(logging, level.upper(), logging.INFO), format="%(message)s")
+
+    for noisy in ("websockets", "httpx", "httpcore", "hpack"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
 logger = IconLogger("eclaw")

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from enum import StrEnum, auto
 
+##### ENUMS #####
+
 
 class PipelineState(StrEnum):
     """Audio pipeline processing state."""
 
-    LISTENING = auto()
-    THINKING = auto()
+    IDLE = auto()
+    STREAMING = auto()
     SPEAKING = auto()
 
 

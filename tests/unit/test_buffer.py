@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from e_clawhisper.shared.operational.buffer import RingBuffer
-
 
 ##### BASIC OPS #####
 

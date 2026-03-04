@@ -6,10 +6,13 @@ import cyclopts
 from rich.console import Console
 from rich.table import Table
 
-from e_clawhisper.shared.settings import load_config, settings
+from e_clawhisper.shared.settings import AgentBackend, STTBackend, TTSBackend, load_config, settings
 
 app = cyclopts.App(name="config", help="Configuration inspection commands.")
 console = Console()
+
+
+##### COMMANDS #####
 
 
 @app.command
@@ -40,8 +43,6 @@ def info() -> None:
 @app.command
 def backends() -> None:
     """List available backends."""
-    from e_clawhisper.shared.settings import AgentBackend, STTBackend, TTSBackend
-
     table = Table(title="Available Backends")
     table.add_column("Type", style="cyan")
     table.add_column("Backends", style="green")

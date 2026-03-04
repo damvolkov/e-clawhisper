@@ -18,7 +18,7 @@ class AgentBase(ABC):
         """Close connection."""
 
     @abstractmethod
-    async def send_message(self, text: str) -> AsyncIterator[str]:
+    def send_message(self, text: str) -> AsyncIterator[str]:
         """Send user text, yield streaming response chunks."""
 
     @abstractmethod

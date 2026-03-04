@@ -10,12 +10,11 @@ import pytest
 from e_clawhisper.shared.settings import (
     AgentBackend,
     AppConfig,
-    STTBackend,
     Settings,
+    STTBackend,
     TTSBackend,
     VADBackend,
 )
-
 
 ##### ENUMS #####
 
@@ -54,7 +53,9 @@ def test_app_config_defaults() -> None:
     assert cfg.stt.backend == STTBackend.WHISPERLIVE
     assert cfg.tts.backend == TTSBackend.PIPER
     assert cfg.vad.threshold == 0.5
+    assert cfg.vad.min_recording_time == 1.0
     assert cfg.audio.sample_rate == 16000
+    assert cfg.audio.pre_roll_seconds == 2.0
 
 
 ##### YAML LOADING #####

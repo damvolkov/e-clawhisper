@@ -10,7 +10,7 @@ class TTSBase(ABC):
     """Abstract TTS backend."""
 
     @abstractmethod
-    async def synthesize(self, text: str) -> AsyncIterator[bytes]:
+    def synthesize(self, text: str) -> AsyncIterator[bytes]:
         """Synthesize text, yield PCM audio chunks."""
 
     @abstractmethod

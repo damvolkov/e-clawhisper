@@ -18,8 +18,12 @@ from e_clawhisper.shared.settings import AgentBackend, AppConfig, STTBackend, TT
 class PipelineManager:
     """Factory that assembles pipeline components from config."""
 
+    __slots__ = ("_config",)
+
     def __init__(self, config: AppConfig) -> None:
         self._config = config
+
+    ##### FACTORIES #####
 
     def create_audio_device(self) -> AudioDevice:
         cfg = self._config.audio
@@ -45,13 +49,19 @@ class PipelineManager:
         match self._config.stt.backend:
             case STTBackend.WHISPERLIVE:
                 return WhisperLiveAdapter(config=self._config.stt.whisperlive)
+            case _:
+                raise ValueError(f"Unsupported STT backend: {self._config.stt.backend}")
 
     def create_tts(self) -> TTSBase:
         match self._config.tts.backend:
             case TTSBackend.PIPER:
                 return PiperAdapter(config=self._config.tts.piper)
+            case _:
+                raise ValueError(f"Unsupported TTS backend: {self._config.tts.backend}")
 
     def create_agent(self) -> AgentBase:
         match self._config.agent.backend:
             case AgentBackend.OPENFANG:
                 return OpenFangAdapter(config=self._config.backends.openfang)
+            case _:
+                raise ValueError(f"Unsupported agent backend: {self._config.agent.backend}")

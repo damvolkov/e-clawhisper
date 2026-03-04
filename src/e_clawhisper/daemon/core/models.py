@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+##### PIPELINE #####
+
 
 class VADResult(BaseModel):
-    """Result of a single VAD frame."""
+    """Result of processing one or more VAD frames."""
 
     is_speech: bool
+    should_stop: bool
     probability: float
 
 
@@ -24,6 +27,9 @@ class AgentResponse(BaseModel):
 
     text: str
     is_final: bool = False
+
+
+##### IPC #####
 
 
 class DaemonStatus(BaseModel):

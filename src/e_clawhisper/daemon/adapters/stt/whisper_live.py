@@ -1,8 +1,9 @@
-"""WhisperLive STT adapter — streaming WebSocket transcription."""
+"""WhisperLive STT adapter — persistent WebSocket with per-utterance sessions."""
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from collections.abc import AsyncIterator
 from uuid import uuid4
 
@@ -19,12 +20,25 @@ from e_clawhisper.shared.settings import WhisperLiveConfig
 class WhisperLiveAdapter(STTBase):
     """Streaming STT via WhisperLive WebSocket.
 
-    Protocol:
-        1. Connect → send config JSON → wait READY
-        2. Stream float32 audio chunks
-        3. Receive partial transcripts (segments JSON)
-        4. Send END_OF_AUDIO → collect final → close
+    Connection lifecycle:
+        connect()         → initial WS, triggers model load on server
+        start_utterance() → reconnect WS for fresh session
+        stream_audio()    → send float32 audio bytes
+        finish_utterance() → END_OF_AUDIO, collect final transcript
+        disconnect()      → full teardown
     """
+
+    __slots__ = (
+        "_ws_url",
+        "_model",
+        "_language",
+        "_ws",
+        "_uid",
+        "_transcript_queue",
+        "_recv_task",
+        "_final_text",
+        "_ready",
+    )
 
     def __init__(self, config: WhisperLiveConfig) -> None:
         self._ws_url = f"ws://{config.host}:{config.port}"
@@ -35,58 +49,46 @@ class WhisperLiveAdapter(STTBase):
         self._transcript_queue: asyncio.Queue[str] = asyncio.Queue()
         self._recv_task: asyncio.Task[None] | None = None
         self._final_text: str = ""
+        self._ready = False
+
+    ##### CONNECTION #####
 
     async def connect(self) -> None:
-        self._uid = str(uuid4())
-        self._ws = await websockets.connect(self._ws_url, max_size=None)
-
-        config_msg = orjson.dumps({
-            "uid": self._uid,
-            "language": self._language,
-            "task": "transcribe",
-            "model": self._model,
-            "use_vad": False,
-        })
-        await self._ws.send(config_msg)
-
-        ready_msg = await self._ws.recv()
-        ready = orjson.loads(ready_msg)
-        if ready.get("status") != "READY":
-            logger.warning("whisperlive unexpected ready: %s", ready, icon=LogIcon.STT)
-
-        self._final_text = ""
-        self._recv_task = asyncio.create_task(self._receive_loop())
-        logger.debug("whisperlive_connected uid=%s", self._uid[:8], icon=LogIcon.STT)
+        """Initial connection — warms up STT model on server."""
+        await self._open_session()
+        logger.info("stt_connected (model warm-up) url=%s", self._ws_url, icon=LogIcon.STT)
 
     async def disconnect(self) -> None:
-        if self._recv_task:
-            self._recv_task.cancel()
-            self._recv_task = None
-        if self._ws:
-            await self._ws.close()
-            self._ws = None
+        await self._close_session()
+        logger.info("stt_disconnected", icon=LogIcon.STT)
+
+    async def start_utterance(self) -> None:
+        """Reconnect for a new utterance session (fast, model already loaded)."""
+        await self._close_session()
+        await self._open_session()
+        logger.debug("stt_utterance_started uid=%s", self._uid[:8], icon=LogIcon.STT)
+
+    ##### STREAMING #####
 
     async def stream_audio(self, audio_chunk: bytes) -> None:
-        """Send raw float32 audio bytes to WhisperLive."""
-        if self._ws:
+        if self._ws and self._ready:
             await self._ws.send(audio_chunk)
 
-    async def finish_stream(self) -> str:
-        """Signal end-of-audio and return accumulated transcript."""
+    async def finish_utterance(self) -> str:
+        """Send END_OF_AUDIO and return accumulated transcript."""
         if self._ws:
-            await self._ws.send('{"type": "END_OF_AUDIO"}')
+            with contextlib.suppress(websockets.exceptions.ConnectionClosed):
+                await self._ws.send('{"type": "END_OF_AUDIO"}')
             if self._recv_task:
-                try:
+                with contextlib.suppress(TimeoutError, asyncio.CancelledError):
                     await asyncio.wait_for(self._recv_task, timeout=5.0)
-                except (TimeoutError, asyncio.CancelledError):
-                    pass
                 self._recv_task = None
-            await self._ws.close()
-            self._ws = None
 
         result = self._final_text
-        logger.debug("stt_final: %s", result[:120], icon=LogIcon.STT)
+        logger.debug("stt_final: %s", result[:120] if result else "(empty)", icon=LogIcon.STT)
         return result
+
+    ##### TRANSCRIPTION #####
 
     async def _receive_loop(self) -> None:
         """Background task: receive transcript segments from WhisperLive."""
@@ -95,26 +97,66 @@ class WhisperLiveAdapter(STTBase):
             async for msg in self._ws:
                 data = orjson.loads(msg)
                 if "segments" in data:
-                    text = " ".join(
-                        seg_text for seg in data["segments"] if (seg_text := seg.get("text", "").strip())
-                    )
+                    text = " ".join(seg_text for seg in data["segments"] if (seg_text := seg.get("text", "").strip()))
                     if text:
                         self._final_text = text
-                        self._transcript_queue.put_nowait(text)
+                        with contextlib.suppress(asyncio.QueueFull):
+                            self._transcript_queue.put_nowait(text)
                 if data.get("eos"):
                     break
         except websockets.exceptions.ConnectionClosed:
             pass
 
     async def transcript_stream(self) -> AsyncIterator[str]:
-        """Yield partial transcripts as they arrive."""
         while True:
             try:
-                text = await asyncio.wait_for(self._transcript_queue.get(), timeout=0.1)
-                yield text
+                yield await asyncio.wait_for(self._transcript_queue.get(), timeout=0.1)
             except TimeoutError:
                 if self._ws is None:
                     break
+
+    ##### SESSION MANAGEMENT #####
+
+    async def _open_session(self) -> None:
+        self._uid = str(uuid4())
+        self._final_text = ""
+        self._ready = False
+
+        while not self._transcript_queue.empty():
+            self._transcript_queue.get_nowait()
+
+        self._ws = await websockets.connect(self._ws_url, max_size=None)
+
+        config_msg = orjson.dumps(
+            {
+                "uid": self._uid,
+                "language": self._language,
+                "task": "transcribe",
+                "model": self._model,
+                "use_vad": False,
+            }
+        )
+        await self._ws.send(config_msg)
+
+        ready_msg = await self._ws.recv()
+        ready = orjson.loads(ready_msg)
+        if ready.get("message") != "SERVER_READY":
+            logger.warning("whisperlive unexpected ready: %s", ready, icon=LogIcon.STT)
+
+        self._ready = True
+        self._recv_task = asyncio.create_task(self._receive_loop())
+
+    async def _close_session(self) -> None:
+        if self._recv_task:
+            self._recv_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._recv_task
+            self._recv_task = None
+        if self._ws:
+            with contextlib.suppress(websockets.exceptions.ConnectionClosed):
+                await self._ws.close()
+            self._ws = None
+        self._ready = False
 
     @staticmethod
     def audio_to_float32(audio_int16: np.ndarray) -> bytes:

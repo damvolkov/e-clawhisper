@@ -9,13 +9,18 @@ import orjson
 from rich.console import Console
 from rich.table import Table
 
-from e_clawhisper.shared.settings import settings
+from e_clawhisper.daemon.core.models import DaemonStatus
+from e_clawhisper.daemon.server import DaemonServer
+from e_clawhisper.shared.logger import configure_logging
+from e_clawhisper.shared.settings import load_config, settings
 
 app = cyclopts.App(name="session", help="Daemon lifecycle commands.")
 console = Console()
 
+##### HELPERS #####
 
-async def _send_ipc(command: str) -> dict:
+
+async def _send_ipc(command: str) -> dict[str, object]:
     """Send a command to the daemon via Unix socket."""
     try:
         reader, writer = await asyncio.open_unix_connection(settings.SOCKET_PATH)
@@ -29,16 +34,14 @@ async def _send_ipc(command: str) -> dict:
         return {"status": "error", "message": "daemon not running"}
 
 
+##### COMMANDS #####
+
+
 @app.command
 def start() -> None:
     """Start the voice daemon (foreground)."""
-    from e_clawhisper.daemon.server import DaemonServer
-    from e_clawhisper.shared.logger import configure_logging
-    from e_clawhisper.shared.settings import load_config
-
     configure_logging(settings.LOG_LEVEL)
-    config = load_config()
-    server = DaemonServer(config)
+    server = DaemonServer(load_config())
     asyncio.run(server.run())
 
 
@@ -61,15 +64,19 @@ def status() -> None:
         console.print(f"[red]{result.get('message', 'unknown error')}[/red]")
         return
 
-    data = result.get("data", {})
+    if not isinstance(raw := result.get("data"), dict):
+        console.print("[red]Invalid response data[/red]")
+        return
+
+    status = DaemonStatus.model_validate(raw)
     table = Table(title="eclaw daemon status")
     table.add_column("Property", style="cyan")
     table.add_column("Value", style="green")
 
-    table.add_row("Running", str(data.get("running", False)))
-    table.add_row("Pipeline State", data.get("pipeline_state", "unknown"))
-    table.add_row("Conversation Active", str(data.get("conversation_active", False)))
-    table.add_row("Agent Name", data.get("agent_name", ""))
-    table.add_row("Agent Backend", data.get("agent_backend", ""))
+    table.add_row("Running", str(status.running))
+    table.add_row("Pipeline State", status.pipeline_state)
+    table.add_row("Conversation Active", str(status.conversation_active))
+    table.add_row("Agent Name", status.agent_name)
+    table.add_row("Agent Backend", status.agent_backend)
 
     console.print(table)

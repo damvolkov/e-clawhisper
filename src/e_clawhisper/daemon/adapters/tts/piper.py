@@ -18,6 +18,8 @@ from e_clawhisper.shared.settings import PiperConfig
 class PiperAdapter(TTSBase):
     """TTS via Piper Wyoming protocol."""
 
+    __slots__ = ("_host", "_port", "_sample_rate", "_stopped")
+
     def __init__(self, config: PiperConfig) -> None:
         self._host = config.host
         self._port = config.port
@@ -39,8 +41,7 @@ class PiperAdapter(TTSBase):
             logger.debug("tts_synthesize: %s", text[:80], icon=LogIcon.TTS)
 
             while not self._stopped:
-                event = await client.read_event()
-                if event is None:
+                if (event := await client.read_event()) is None:
                     break
                 if AudioChunk.is_type(event.type):
                     yield AudioChunk.from_event(event).audio

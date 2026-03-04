@@ -7,9 +7,8 @@ from pathlib import Path
 from typing import ClassVar
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 ##### ENUMS #####
 
@@ -29,6 +28,17 @@ class TTSBackend(StrEnum):
 class VADBackend(StrEnum):
     TEN_VAD = auto()
 
+
+##### CONSTANTS #####
+
+_DEFAULT_VOICES: dict[str, str] = {
+    "en": "en_US-lessac-medium",
+    "es": "es_ES-sharvard-medium",
+    "fr": "fr_FR-siwis-medium",
+    "de": "de_DE-thorsten-medium",
+    "it": "it_IT-riccardo-x_low",
+    "pt": "pt_BR-faber-medium",
+}
 
 ##### YAML CONFIG MODELS #####
 
@@ -71,12 +81,14 @@ class VADConfig(BaseModel):
     backend: VADBackend = VADBackend.TEN_VAD
     threshold: float = 0.5
     silence_duration: float = 1.5
+    min_recording_time: float = 1.0
 
 
 class AudioConfig(BaseModel):
     sample_rate: int = 16000
     channels: int = 1
     chunk_size: int = 512
+    pre_roll_seconds: float = 2.0
 
 
 class AgentConfig(BaseModel):
@@ -87,12 +99,23 @@ class AgentConfig(BaseModel):
 class AppConfig(BaseModel):
     """Application config loaded from config.yaml."""
 
+    language: str = "en"
     agent: AgentConfig = AgentConfig()
     backends: BackendsConfig = BackendsConfig()
     stt: STTConfig = STTConfig()
     tts: TTSConfig = TTSConfig()
     vad: VADConfig = VADConfig()
     audio: AudioConfig = AudioConfig()
+
+    @model_validator(mode="after")
+    def cascade_language(self) -> AppConfig:
+        """Propagate top-level language to STT and TTS when they're still at defaults."""
+        lang = self.language
+        if self.stt.whisperlive.language == "en" and lang != "en":
+            self.stt.whisperlive.language = lang
+        if self.tts.piper.voice == "en_US-lessac-medium" and lang != "en":
+            self.tts.piper.voice = _DEFAULT_VOICES.get(lang, self.tts.piper.voice)
+        return self
 
     @classmethod
     def from_yaml(cls, path: Path) -> AppConfig:

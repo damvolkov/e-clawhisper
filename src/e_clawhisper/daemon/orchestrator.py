@@ -9,7 +9,9 @@ from e_clawhisper.shared.settings import AppConfig
 
 
 class Orchestrator:
-    """Assembles the pipeline from config and manages its lifecycle."""
+    """Assembles the pipeline from config, connects all adapters at startup."""
+
+    __slots__ = ("_config", "_runner", "_manager")
 
     def __init__(self, config: AppConfig) -> None:
         self._config = config
@@ -20,23 +22,33 @@ class Orchestrator:
     def runner(self) -> PipelineRunner | None:
         return self._runner
 
+    ##### LIFECYCLE #####
+
     async def start(self) -> None:
-        """Resolve agent, assemble pipeline, start the loop."""
+        """Resolve agent, connect all adapters, start the pipeline."""
         agent = self._manager.create_agent()
+        stt = self._manager.create_stt()
         agent_name = self._config.agent.name
 
         logger.info("resolving agent '%s'...", agent_name, icon=LogIcon.AGENT)
         agent_id = await agent.resolve_agent_id(agent_name)
         await agent.connect(agent_id)
 
+        logger.info("connecting STT (warm-up)...", icon=LogIcon.STT)
+        await stt.connect()
+
+        pre_roll_capacity = int(self._config.audio.pre_roll_seconds * self._config.audio.sample_rate)
+
         self._runner = PipelineRunner(
             audio_device=self._manager.create_audio_device(),
             vad=self._manager.create_vad(),
-            stt=self._manager.create_stt(),
+            stt=stt,
             tts=self._manager.create_tts(),
             agent=agent,
             wake_word=self._manager.create_wake_word(),
             turn_manager=self._manager.create_turn_manager(),
+            pre_roll_capacity=pre_roll_capacity,
+            tts_sample_rate=self._config.tts.piper.sample_rate,
         )
 
         logger.info(
