@@ -122,10 +122,7 @@ class Orchestrator:
         """Run single turn cycle, then back to sentinel."""
         logger.set_pipeline("TURN")
 
-        result = await self._turn.run(
-            audio_queue=self._audio.queue,
-            play_fn=self._audio.play_audio,
-        )
+        result = await self._turn.run(audio=self._audio)
 
         match result:
             case TurnComplete():
