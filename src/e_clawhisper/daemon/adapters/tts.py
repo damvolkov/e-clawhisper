@@ -16,12 +16,13 @@ from e_clawhisper.shared.settings import PiperConfig
 class TTSAdapter:
     """TTS via Piper Wyoming protocol."""
 
-    __slots__ = ("_host", "_port", "_sample_rate", "_stopped")
+    __slots__ = ("_host", "_port", "_sample_rate", "_disconnect_timeout", "_stopped")
 
     def __init__(self, config: PiperConfig) -> None:
         self._host = config.host
         self._port = config.port
         self._sample_rate = config.sample_rate
+        self._disconnect_timeout = config.disconnect_timeout
         self._stopped = False
 
     @property
@@ -46,7 +47,7 @@ class TTSAdapter:
                     break
         finally:
             with contextlib.suppress(BrokenPipeError, ConnectionResetError, OSError):
-                await asyncio.wait_for(client.disconnect(), timeout=0.5)
+                await asyncio.wait_for(client.disconnect(), timeout=self._disconnect_timeout)
 
     async def stop(self) -> None:
         self._stopped = True

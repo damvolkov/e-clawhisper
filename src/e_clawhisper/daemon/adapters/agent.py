@@ -1,4 +1,4 @@
-"""OpenFang LLM adapter — persistent WebSocket with background receive."""
+"""OpenFang agent adapter — persistent WebSocket with background receive."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from e_clawhisper.shared.settings import OpenFangConfig
 _RESPONSE_TYPES = frozenset({"text_delta", "response", "typing", "tool_start", "tool_result", "phase"})
 
 
-class LLMAdapter:
+class AgentAdapter:
     """Persistent WebSocket to OpenFang agent with background message dispatch."""
 
     __slots__ = ("_host", "_port", "_timeout", "_base_url", "_ws", "_agent_id", "_response_queue", "_recv_task")
@@ -46,10 +46,10 @@ class LLMAdapter:
         connected_msg = await self._ws.recv()
         data = orjson.loads(connected_msg)
         if data.get("type") != "connected":
-            logger.warning(f"LLM unexpected connect: {data}")
+            logger.warning(f"agent unexpected connect: {data}")
 
         self._recv_task = asyncio.create_task(self._receive_loop())
-        logger.system("OK", f"LLM connected agent_id={agent_id[:12]}")
+        logger.system("OK", f"agent connected agent_id={agent_id[:12]}")
 
     async def disconnect(self) -> None:
         if self._recv_task:
@@ -61,7 +61,7 @@ class LLMAdapter:
             with contextlib.suppress(websockets.exceptions.ConnectionClosed):
                 await self._ws.close()
             self._ws = None
-            logger.system("STOP", "LLM disconnected")
+            logger.system("STOP", "agent disconnected")
 
     async def is_connected(self) -> bool:
         return self._ws is not None and self._recv_task is not None
@@ -80,13 +80,15 @@ class LLMAdapter:
                 elif msg_type not in ("agents_updated", "connected"):
                     logger.turn_debug("AGENT", f"unknown: {msg_type}")
         except websockets.exceptions.ConnectionClosed:
-            logger.warning("LLM connection lost")
+            self._ws = None
+            await self._response_queue.put({"type": "connection_lost"})
+            logger.warning("agent connection lost")
 
     ##### MESSAGING #####
 
     async def send(self, text: str) -> AsyncIterator[str]:
         if not self._ws:
-            msg = "LLM WebSocket not connected"
+            msg = "agent WebSocket not connected"
             raise ConnectionError(msg)
 
         while not self._response_queue.empty():
@@ -99,7 +101,7 @@ class LLMAdapter:
             try:
                 data = await asyncio.wait_for(self._response_queue.get(), timeout=self._timeout)
             except TimeoutError:
-                logger.warning(f"LLM response timeout after {self._timeout:.0f}s")
+                logger.warning(f"agent response timeout after {self._timeout:.0f}s")
                 break
 
             match data.get("type", ""):
@@ -115,6 +117,9 @@ class LLMAdapter:
                     continue
                 case "tool_start" | "tool_result":
                     logger.turn_debug("AGENT", f"tool: {data.get('type')}")
+                case "connection_lost":
+                    logger.warning("agent connection lost during response")
+                    break
 
     ##### RESOLUTION #####
 

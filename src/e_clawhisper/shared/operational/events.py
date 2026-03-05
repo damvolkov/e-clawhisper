@@ -36,7 +36,7 @@ class TurnError:
 
 @dataclass(slots=True)
 class Turn:
-    """Mutable turn data accumulated during a single STT→LLM→TTS cycle."""
+    """Mutable turn data accumulated during a single STT→Agent→TTS cycle."""
 
     turn_id: str = field(default_factory=lambda: uuid4().hex[:12])
     transcript: str = ""

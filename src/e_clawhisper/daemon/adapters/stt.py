@@ -22,6 +22,7 @@ class STTAdapter:
         "_ws_url",
         "_model",
         "_language",
+        "_finish_timeout",
         "_ws",
         "_uid",
         "_recv_task",
@@ -33,6 +34,7 @@ class STTAdapter:
         self._ws_url = f"ws://{config.host}:{config.port}"
         self._model = config.model
         self._language = config.language
+        self._finish_timeout = config.finish_timeout
         self._ws: ClientConnection | None = None
         self._uid: str = ""
         self._recv_task: asyncio.Task[None] | None = None
@@ -65,7 +67,7 @@ class STTAdapter:
                 await self._ws.send('{"type": "END_OF_AUDIO"}')
             if self._recv_task:
                 with contextlib.suppress(TimeoutError, asyncio.CancelledError):
-                    await asyncio.wait_for(self._recv_task, timeout=5.0)
+                    await asyncio.wait_for(self._recv_task, timeout=self._finish_timeout)
                 self._recv_task = None
 
         return self._final_text

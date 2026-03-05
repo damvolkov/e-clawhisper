@@ -1,11 +1,11 @@
-"""Turn pipeline — single STT → LLM → TTS cycle with 3-stage streaming.
+"""Turn pipeline — single STT → Agent → TTS cycle with 3-stage streaming.
 
 Flow:
   1. Open STT WebSocket session
   2. Stream audio chunks to STT ‖ VAD monitors end-of-speech (parallel)
   3. Silence detected → close STT → get transcript
   4. Three concurrent stages:
-     a) LLM text_delta → sentence splitter → sentence_queue
+     a) Agent text_delta → sentence splitter → sentence_queue
      b) sentence_queue → TTS synthesize → pcm_queue
      c) pcm_queue → sd.RawOutputStream (speaker)
   5. Return TurnComplete or TurnError
@@ -17,8 +17,8 @@ import asyncio
 import re
 from concurrent.futures import ThreadPoolExecutor
 
+from e_clawhisper.daemon.adapters.agent import AgentAdapter
 from e_clawhisper.daemon.adapters.audio import AudioAdapter
-from e_clawhisper.daemon.adapters.llm import LLMAdapter
 from e_clawhisper.daemon.adapters.stt import STTAdapter
 from e_clawhisper.daemon.adapters.tts import TTSAdapter
 from e_clawhisper.daemon.turn.vad import EndOfSpeechDetector
@@ -35,11 +35,13 @@ class TurnPipeline:
 
     __slots__ = (
         "_stt",
-        "_llm",
+        "_agent",
         "_tts",
         "_vad",
         "_executor",
         "_tts_sample_rate",
+        "_sentence_queue",
+        "_pcm_queue",
         "_running",
     )
 
@@ -47,18 +49,29 @@ class TurnPipeline:
         self,
         *,
         stt: STTAdapter,
-        llm: LLMAdapter,
+        agent: AgentAdapter,
         tts: TTSAdapter,
         vad_config: VADConfig,
         tts_sample_rate: int = 22050,
+        pcm_queue_size: int = 20,
     ) -> None:
         self._stt = stt
-        self._llm = llm
+        self._agent = agent
         self._tts = tts
         self._vad = EndOfSpeechDetector(vad_config)
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._tts_sample_rate = tts_sample_rate
+        self._sentence_queue: asyncio.Queue[str | None] = asyncio.Queue()
+        self._pcm_queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=pcm_queue_size)
         self._running = False
+
+    @property
+    def sentence_queue(self) -> asyncio.Queue[str | None]:
+        return self._sentence_queue
+
+    @property
+    def pcm_queue(self) -> asyncio.Queue[bytes | None]:
+        return self._pcm_queue
 
     async def run(self, audio: AudioAdapter) -> TurnComplete | TurnError:
         """Execute one turn cycle."""
@@ -76,7 +89,9 @@ class TurnPipeline:
                 audio_chunk = await audio.queue.get()
 
                 stt_task = asyncio.create_task(self._stt.stream(audio_chunk.tobytes()))
-                vad_result = await loop.run_in_executor(self._executor, self._vad.process, audio_chunk)
+                vad_result = await loop.run_in_executor(
+                    self._executor, self._vad.process, audio_chunk
+                )
                 await stt_task
 
                 if vad_result.is_speech:
@@ -95,7 +110,7 @@ class TurnPipeline:
 
             logger.turn("STT", logger.truncate(turn.transcript))
 
-            # Phase 3: 3-stage streaming — LLM ‖ TTS ‖ speaker
+            # Phase 3: 3-stage streaming — Agent ‖ TTS ‖ speaker
             turn.response = await self._stream_response(turn.transcript, audio)
 
             if not turn.response.strip():
@@ -111,49 +126,43 @@ class TurnPipeline:
     async def stop(self) -> None:
         self._running = False
 
-    def shutdown(self) -> None:
-        self._executor.shutdown(wait=False)
-
     ##### STREAMING #####
 
-    async def _stream_response(self, transcript: str, audio: AudioAdapter) -> str:
-        """3 concurrent stages: LLM → sentence_queue → TTS → pcm_queue → speaker."""
-        logger.turn("AGENT", f"query: {logger.truncate(transcript)}")
+    def drain_queues(self) -> None:
+        """Discard all pending items from sentence and pcm queues."""
+        for q in (self._sentence_queue, self._pcm_queue):
+            while not q.empty():
+                q.get_nowait()
 
-        sentence_queue: asyncio.Queue[str | None] = asyncio.Queue()
-        pcm_queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=20)
+    async def _stream_response(self, transcript: str, audio: AudioAdapter) -> str:
+        """3 concurrent stages: Agent → sentence_queue → TTS → pcm_queue → speaker."""
+        logger.turn("AGENT", f"query: {logger.truncate(transcript)}")
+        self.drain_queues()
         response_parts: list[str] = []
 
-        stage_llm = asyncio.create_task(self._stage_llm_to_sentences(transcript, sentence_queue))
-        stage_tts = asyncio.create_task(
-            self._stage_tts_to_pcm(sentence_queue, pcm_queue, response_parts)
-        )
+        stage_agent = asyncio.create_task(self._stage_agent_to_sentences(transcript))
+        stage_tts = asyncio.create_task(self._stage_tts_to_pcm(response_parts))
         stage_speaker = asyncio.create_task(
-            audio.play(pcm_queue, self._tts_sample_rate)
+            audio.play(self._pcm_queue, self._tts_sample_rate)
         )
 
         duration = 0.0
         try:
             duration = await stage_speaker
-            await asyncio.gather(stage_llm, stage_tts)
-        except Exception:
-            stage_llm.cancel()
-            stage_tts.cancel()
-            stage_speaker.cancel()
-            raise
+            await asyncio.gather(stage_agent, stage_tts)
+        finally:
+            for task in (stage_agent, stage_tts, stage_speaker):
+                task.cancel()
+            await asyncio.gather(stage_agent, stage_tts, stage_speaker, return_exceptions=True)
 
         logger.turn("TTS", f"played {duration:.1f}s streaming")
         return " ".join(response_parts)
 
-    async def _stage_llm_to_sentences(
-        self,
-        transcript: str,
-        sentence_queue: asyncio.Queue[str | None],
-    ) -> None:
-        """LLM text_delta → sentence boundary → sentence_queue."""
+    async def _stage_agent_to_sentences(self, transcript: str) -> None:
+        """Agent text_delta → sentence boundary → sentence_queue."""
         buffer = ""
         try:
-            async for chunk in self._llm.send(transcript):
+            async for chunk in self._agent.send(transcript):
                 buffer += chunk
 
                 while (m := _SENTENCE_RE.search(buffer)) is not None:
@@ -161,27 +170,22 @@ class TurnPipeline:
                     buffer = buffer[m.end() :]
                     if sentence:
                         logger.turn_debug("STREAM", f"sentence: {logger.truncate(sentence, 50)}")
-                        await sentence_queue.put(sentence)
+                        await self._sentence_queue.put(sentence)
 
             if (remaining := buffer.strip()):
-                await sentence_queue.put(remaining)
+                await self._sentence_queue.put(remaining)
         finally:
-            await sentence_queue.put(_SENTINEL)
+            await self._sentence_queue.put(_SENTINEL)
 
-    async def _stage_tts_to_pcm(
-        self,
-        sentence_queue: asyncio.Queue[str | None],
-        pcm_queue: asyncio.Queue[bytes | None],
-        response_parts: list[str],
-    ) -> None:
+    async def _stage_tts_to_pcm(self, response_parts: list[str]) -> None:
         """sentence_queue → TTS synthesize → pcm_queue."""
         try:
-            while (sentence := await sentence_queue.get()) is not _SENTINEL:
+            while (sentence := await self._sentence_queue.get()) is not _SENTINEL:
                 if not self._running:
                     break
                 response_parts.append(sentence)
                 logger.turn("TTS", f"synthesizing: {logger.truncate(sentence, 50)}")
                 async for pcm_chunk in self._tts.synthesize(sentence):
-                    await pcm_queue.put(pcm_chunk)
+                    await self._pcm_queue.put(pcm_chunk)
         finally:
-            await pcm_queue.put(_SENTINEL)
+            await self._pcm_queue.put(_SENTINEL)

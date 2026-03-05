@@ -51,6 +51,7 @@ class SentinelConfig(BaseModel):
 
     energy_floor: float = 0.01
     vad_threshold: float = 0.5
+    cooldown: float = 1.5
     wakeword: WakewordConfig = WakewordConfig()
 
 
@@ -77,6 +78,7 @@ class WhisperLiveConfig(BaseModel):
     port: int = 9090
     model: str = "small"
     language: str = "en"
+    finish_timeout: float = 5.0
 
 
 class STTConfig(BaseModel):
@@ -89,6 +91,7 @@ class PiperConfig(BaseModel):
     port: int = 10200
     voice: str = "en_US-lessac-medium"
     sample_rate: int = 22050
+    disconnect_timeout: float = 0.5
 
 
 class TTSConfig(BaseModel):
@@ -106,6 +109,8 @@ class AudioConfig(BaseModel):
     channels: int = 1
     chunk_size: int = 512
     pre_roll_seconds: float = 2.0
+    queue_size: int = 100
+    pcm_queue_size: int = 20
 
 
 class LoggingConfig(BaseModel):
@@ -117,6 +122,7 @@ class AppConfig(BaseModel):
     """Application config loaded from config.yaml."""
 
     language: str = "en"
+    turn_timeout: float = 120.0
     agent: AgentConfig = AgentConfig()
     sentinel: SentinelConfig = SentinelConfig()
     vad: VADConfig = VADConfig()

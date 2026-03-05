@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from time import monotonic
 
 import numpy as np
 
@@ -25,6 +26,7 @@ class SentinelPipeline:
         "_vad",
         "_ww",
         "_energy_floor",
+        "_cooldown",
         "_executor",
         "_running",
         "_audio_queue",
@@ -39,6 +41,7 @@ class SentinelPipeline:
             threshold=config.wakeword.threshold,
         )
         self._energy_floor = config.energy_floor
+        self._cooldown = config.cooldown
         self._executor = ThreadPoolExecutor(max_workers=2)
         self._running = False
         self._audio_queue: asyncio.Queue[np.ndarray] | None = None
@@ -57,7 +60,14 @@ class SentinelPipeline:
         self._running = True
         self.wakeword_detected.clear()
         self.last_event = None
+        self._ww.reset()
         loop = asyncio.get_running_loop()
+
+        # Cooldown: discard audio frames to let speaker echo dissipate
+        if self._cooldown > 0:
+            deadline = monotonic() + self._cooldown
+            while monotonic() < deadline and self._running:
+                await audio_queue.get()
 
         logger.sentinel("DEFAULT", f"listening for '{self._ww.name}'")
 
@@ -87,7 +97,7 @@ class SentinelPipeline:
             if ww_score >= self._ww._threshold:
                 logger.sentinel("WAKEWORD", f"'{self._ww.name}' detected", ww=f"{ww_score:.2f}")
                 self.last_event = WakewordEvent(
-                    timestamp=asyncio.get_event_loop().time(),
+                    timestamp=monotonic(),
                     confidence=ww_score,
                     energy=energy,
                 )
@@ -96,6 +106,3 @@ class SentinelPipeline:
 
     async def stop(self) -> None:
         self._running = False
-
-    def shutdown(self) -> None:
-        self._executor.shutdown(wait=False)

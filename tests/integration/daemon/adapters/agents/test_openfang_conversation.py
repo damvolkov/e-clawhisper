@@ -10,7 +10,7 @@ import asyncio
 
 import pytest
 
-from e_clawhisper.daemon.adapters.llm import LLMAdapter
+from e_clawhisper.daemon.adapters.agent import AgentAdapter
 from e_clawhisper.shared.settings import OpenFangConfig
 
 _CONFIG = OpenFangConfig(host="127.0.0.1", port=4200, timeout=30.0)
@@ -43,7 +43,7 @@ async def test_resolve_agent_id() -> None:
     if not await _check_openfang_available():
         pytest.skip("OpenFang not available at 127.0.0.1:4200")
 
-    adapter = LLMAdapter(_CONFIG)
+    adapter = AgentAdapter(_CONFIG)
     agent_id = await adapter.resolve_agent_id(_AGENT_NAME)
 
     assert agent_id
@@ -58,7 +58,7 @@ async def test_connect_and_disconnect() -> None:
     if not await _check_openfang_available():
         pytest.skip("OpenFang not available at 127.0.0.1:4200")
 
-    adapter = LLMAdapter(_CONFIG)
+    adapter = AgentAdapter(_CONFIG)
     agent_id = await adapter.resolve_agent_id(_AGENT_NAME)
     await adapter.connect(agent_id)
 
@@ -80,14 +80,14 @@ async def test_send_message_streaming() -> None:
     if not await _check_openfang_available():
         pytest.skip("OpenFang not available at 127.0.0.1:4200")
 
-    adapter = LLMAdapter(_CONFIG)
+    adapter = AgentAdapter(_CONFIG)
     agent_id = await adapter.resolve_agent_id(_AGENT_NAME)
     await adapter.connect(agent_id)
 
     chunks: list[str] = []
     print("\n  sending: 'Hello, say hi back in one word'")
 
-    async for chunk in adapter.send_message("Hello, say hi back in one word"):
+    async for chunk in adapter.send("Hello, say hi back in one word"):
         chunks.append(chunk)
         print(f"  chunk: {chunk!r}")
 
@@ -108,7 +108,7 @@ async def test_recv_loop_survives_idle_period() -> None:
     if not await _check_openfang_available():
         pytest.skip("OpenFang not available at 127.0.0.1:4200")
 
-    adapter = LLMAdapter(_CONFIG)
+    adapter = AgentAdapter(_CONFIG)
     agent_id = await adapter.resolve_agent_id(_AGENT_NAME)
     await adapter.connect(agent_id)
 
@@ -120,7 +120,7 @@ async def test_recv_loop_survives_idle_period() -> None:
     assert not adapter._recv_task.done(), "recv_task died during idle!"
 
     chunks: list[str] = []
-    async for chunk in adapter.send_message("Say 'test' and nothing else"):
+    async for chunk in adapter.send("Say 'test' and nothing else"):
         chunks.append(chunk)
 
     full = "".join(chunks)
@@ -137,13 +137,13 @@ async def test_multiple_messages_sequential() -> None:
     if not await _check_openfang_available():
         pytest.skip("OpenFang not available at 127.0.0.1:4200")
 
-    adapter = LLMAdapter(_CONFIG)
+    adapter = AgentAdapter(_CONFIG)
     agent_id = await adapter.resolve_agent_id(_AGENT_NAME)
     await adapter.connect(agent_id)
 
     for i, msg in enumerate(["Say 'one'", "Say 'two'", "Say 'three'"]):
         chunks: list[str] = []
-        async for chunk in adapter.send_message(msg):
+        async for chunk in adapter.send(msg):
             chunks.append(chunk)
         full = "".join(chunks)
         print(f"\n  msg {i + 1}: {msg!r} -> {full!r}")

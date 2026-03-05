@@ -1,4 +1,4 @@
-"""Integration test — streaming turn pipeline: LLM → sentence split → TTS → speaker.
+"""Integration test — streaming turn pipeline: Agent → sentence split → TTS → speaker.
 
 Requires OpenFang (127.0.0.1:4200) and Piper TTS (localhost:10200).
 Run with: uv run pytest tests/integration/daemon/test_streaming_pipeline.py -v -s
@@ -10,11 +10,11 @@ import asyncio
 
 import pytest
 
-from e_clawhisper.daemon.adapters.llm import LLMAdapter
+from e_clawhisper.daemon.adapters.agent import AgentAdapter
 from e_clawhisper.daemon.adapters.tts import TTSAdapter
 from e_clawhisper.shared.settings import OpenFangConfig, PiperConfig
 
-_LLM_CONFIG = OpenFangConfig(host="127.0.0.1", port=4200, timeout=30.0)
+_AGENT_CONFIG = OpenFangConfig(host="127.0.0.1", port=4200, timeout=30.0)
 _TTS_CONFIG = PiperConfig(host="localhost", port=10200, sample_rate=22050)
 _AGENT_NAME = "damien"
 
@@ -43,23 +43,23 @@ async def _piper_available() -> bool:
     return True
 
 
-##### LLM → SENTENCE SPLIT → TTS STREAMING #####
+##### AGENT → SENTENCE SPLIT → TTS STREAMING #####
 
 
-async def test_llm_to_tts_streaming_produces_audio() -> None:
-    """Full streaming: LLM text_delta → sentence split → TTS per sentence → PCM chunks."""
+async def test_agent_to_tts_streaming_produces_audio() -> None:
+    """Full streaming: Agent text_delta → sentence split → TTS per sentence → PCM chunks."""
     if not await _openfang_available() or not await _piper_available():
         pytest.skip("OpenFang or Piper not available")
 
-    # Connect LLM
-    llm = LLMAdapter(_LLM_CONFIG)
-    agent_id = await llm.resolve_agent_id(_AGENT_NAME)
-    await llm.connect(agent_id)
+    # Connect agent
+    agent = AgentAdapter(_AGENT_CONFIG)
+    agent_id = await agent.resolve_agent_id(_AGENT_NAME)
+    await agent.connect(agent_id)
 
     tts = TTSAdapter(_TTS_CONFIG)
 
     try:
-        # Stream LLM response with sentence splitting
+        # Stream agent response with sentence splitting
         import re
 
         sentence_re = re.compile(r"(?<=[.!?])\s+|\n")
@@ -70,7 +70,7 @@ async def test_llm_to_tts_streaming_produces_audio() -> None:
 
         print("\n  Sending: 'Dime tres cosas sobre Python. Sé breve.'")
 
-        async for chunk in llm.send("Dime tres cosas sobre Python. Sé breve."):
+        async for chunk in agent.send("Dime tres cosas sobre Python. Sé breve."):
             buffer += chunk
 
             while (m := sentence_re.search(buffer)) is not None:
@@ -109,7 +109,7 @@ async def test_llm_to_tts_streaming_produces_audio() -> None:
         assert all(d > 0.1 for d in sentence_audio_durations), "Some sentences produced too little audio"
 
     finally:
-        await llm.disconnect()
+        await agent.disconnect()
 
 
 async def test_tts_streaming_yields_chunks_incrementally() -> None:

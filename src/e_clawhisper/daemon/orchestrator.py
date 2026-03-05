@@ -10,10 +10,11 @@ Does NOT process audio — only manages pipeline transitions.
 
 from __future__ import annotations
 
+import asyncio
 from enum import StrEnum, auto
 
+from e_clawhisper.daemon.adapters.agent import AgentAdapter
 from e_clawhisper.daemon.adapters.audio import AudioAdapter
-from e_clawhisper.daemon.adapters.llm import LLMAdapter
 from e_clawhisper.daemon.adapters.stt import STTAdapter
 from e_clawhisper.daemon.adapters.tts import TTSAdapter
 from e_clawhisper.daemon.sentinel.pipeline import SentinelPipeline
@@ -36,7 +37,7 @@ class Orchestrator:
         "_audio",
         "_stt",
         "_tts",
-        "_llm",
+        "_agent",
         "_sentinel",
         "_turn",
         "_phase",
@@ -50,16 +51,17 @@ class Orchestrator:
         self._audio = AudioAdapter(config.audio)
         self._stt = self._create_stt()
         self._tts = self._create_tts()
-        self._llm = self._create_llm()
+        self._agent = self._create_agent()
 
         # Pipelines
         self._sentinel = SentinelPipeline(config.sentinel)
         self._turn = TurnPipeline(
             stt=self._stt,
-            llm=self._llm,
+            agent=self._agent,
             tts=self._tts,
             vad_config=config.vad,
             tts_sample_rate=config.tts.piper.sample_rate,
+            pcm_queue_size=config.audio.pcm_queue_size,
         )
 
         self._phase = PipelinePhase.SENTINEL
@@ -75,8 +77,8 @@ class Orchestrator:
         self._running = True
 
         logger.system("START", f"resolving agent '{self._config.agent.name}'...")
-        agent_id = await self._llm.resolve_agent_id(self._config.agent.name)
-        await self._llm.connect(agent_id)
+        agent_id = await self._agent.resolve_agent_id(self._config.agent.name)
+        await self._agent.connect(agent_id)
 
         logger.system("START", "connecting STT (warm-up)...")
         await self._stt.connect()
@@ -119,7 +121,25 @@ class Orchestrator:
     async def _run_turn(self) -> None:
         logger.set_pipeline("TURN")
 
-        result = await self._turn.run(audio=self._audio)
+        if not await self._agent.is_connected():
+            try:
+                logger.system("WARN", "agent reconnecting...")
+                await self._agent.disconnect()
+                await self._agent.connect(self._agent.agent_id)
+            except Exception as exc:
+                logger.warning(f"agent reconnect failed: {exc}")
+                self._phase = PipelinePhase.SENTINEL
+                return
+
+        try:
+            async with asyncio.timeout(self._config.turn_timeout):
+                result = await self._turn.run(audio=self._audio)
+        except TimeoutError:
+            logger.warning(f"turn timeout after {self._config.turn_timeout:.0f}s")
+            await self._turn.stop()
+            result = TurnError(turn_id="timeout", reason="turn_timeout")
+
+        self._audio.drain()
 
         match result:
             case TurnComplete():
@@ -138,9 +158,7 @@ class Orchestrator:
     async def _shutdown(self) -> None:
         await self._audio.stop()
         await self._stt.disconnect()
-        await self._llm.disconnect()
-        self._sentinel.shutdown()
-        self._turn.shutdown()
+        await self._agent.disconnect()
         logger.system("STOP", "orchestrator stopped")
 
     ##### FACTORIES #####
@@ -159,9 +177,9 @@ class Orchestrator:
             case _:
                 raise ValueError(f"Unsupported TTS: {self._config.tts.backend}")
 
-    def _create_llm(self) -> LLMAdapter:
+    def _create_agent(self) -> AgentAdapter:
         match self._config.agent.backend:
             case AgentBackend.OPENFANG:
-                return LLMAdapter(config=self._config.backends.openfang)
+                return AgentAdapter(config=self._config.backends.openfang)
             case _:
                 raise ValueError(f"Unsupported agent: {self._config.agent.backend}")

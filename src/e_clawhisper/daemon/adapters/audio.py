@@ -28,7 +28,7 @@ class AudioAdapter:
         self._sample_rate = config.sample_rate
         self._channels = config.channels
         self._chunk_size = config.chunk_size
-        self._queue: asyncio.Queue[np.ndarray] = asyncio.Queue(maxsize=100)
+        self._queue: asyncio.Queue[np.ndarray] = asyncio.Queue(maxsize=config.queue_size)
         self._stream: sd.InputStream | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._playback_stopped = False
@@ -80,7 +80,6 @@ class AudioAdapter:
     async def play(self, pcm_queue: asyncio.Queue[bytes | None], sample_rate: int) -> float:
         """Consume PCM int16 chunks from queue → speaker. Returns seconds played."""
         self._playback_stopped = False
-        loop = asyncio.get_running_loop()
         total_samples = 0
 
         out = sd.RawOutputStream(samplerate=sample_rate, channels=1, dtype="int16")
@@ -89,7 +88,7 @@ class AudioAdapter:
             while (pcm_chunk := await pcm_queue.get()) is not None:
                 if self._playback_stopped:
                     break
-                await loop.run_in_executor(None, out.write, pcm_chunk)
+                await asyncio.to_thread(out.write, pcm_chunk)
                 total_samples += len(pcm_chunk) // 2
         finally:
             with contextlib.suppress(sd.PortAudioError):
@@ -97,6 +96,11 @@ class AudioAdapter:
                 out.close()
 
         return total_samples / sample_rate
+
+    def drain(self) -> None:
+        """Discard all queued audio frames."""
+        while not self._queue.empty():
+            self._queue.get_nowait()
 
     def stop_playback(self) -> None:
         self._playback_stopped = True
