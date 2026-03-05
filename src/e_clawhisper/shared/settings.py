@@ -25,10 +25,6 @@ class TTSBackend(StrEnum):
     PIPER = auto()
 
 
-class VADBackend(StrEnum):
-    TEN_VAD = auto()
-
-
 ##### CONSTANTS #####
 
 _DEFAULT_VOICES: dict[str, str] = {
@@ -41,6 +37,29 @@ _DEFAULT_VOICES: dict[str, str] = {
 }
 
 ##### YAML CONFIG MODELS #####
+
+
+class WakewordConfig(BaseModel):
+    """Wake word detection (OpenWakeWord ONNX)."""
+
+    model: str = "alexa"
+    threshold: float = 0.5
+
+
+class SentinelConfig(BaseModel):
+    """Sentinel pipeline — passive listening."""
+
+    energy_floor: float = 0.01
+    vad_threshold: float = 0.5
+    wakeword: WakewordConfig = WakewordConfig()
+
+
+class VADConfig(BaseModel):
+    """Turn-pipeline VAD — end-of-speech detection (Silero ONNX)."""
+
+    threshold: float = 0.5
+    silence_duration: float = 1.5
+    min_recording_time: float = 1.0
 
 
 class OpenFangConfig(BaseModel):
@@ -77,11 +96,9 @@ class TTSConfig(BaseModel):
     piper: PiperConfig = PiperConfig()
 
 
-class VADConfig(BaseModel):
-    backend: VADBackend = VADBackend.TEN_VAD
-    threshold: float = 0.5
-    silence_duration: float = 1.5
-    min_recording_time: float = 1.0
+class AgentConfig(BaseModel):
+    name: str = "damien"
+    backend: AgentBackend = AgentBackend.OPENFANG
 
 
 class AudioConfig(BaseModel):
@@ -91,9 +108,9 @@ class AudioConfig(BaseModel):
     pre_roll_seconds: float = 2.0
 
 
-class AgentConfig(BaseModel):
-    name: str = "damien"
-    backend: AgentBackend = AgentBackend.OPENFANG
+class LoggingConfig(BaseModel):
+    idle_interval: float = 0.5
+    turn_interval: float = 0.5
 
 
 class AppConfig(BaseModel):
@@ -101,15 +118,17 @@ class AppConfig(BaseModel):
 
     language: str = "en"
     agent: AgentConfig = AgentConfig()
+    sentinel: SentinelConfig = SentinelConfig()
+    vad: VADConfig = VADConfig()
     backends: BackendsConfig = BackendsConfig()
     stt: STTConfig = STTConfig()
     tts: TTSConfig = TTSConfig()
-    vad: VADConfig = VADConfig()
     audio: AudioConfig = AudioConfig()
+    logging: LoggingConfig = LoggingConfig()
 
     @model_validator(mode="after")
     def cascade_language(self) -> AppConfig:
-        """Propagate top-level language to STT and TTS when they're still at defaults."""
+        """Propagate top-level language to STT and TTS when at defaults."""
         lang = self.language
         if self.stt.whisperlive.language == "en" and lang != "en":
             self.stt.whisperlive.language = lang
@@ -137,6 +156,7 @@ class Settings(BaseSettings):
     BASE_DIR: ClassVar[Path] = Path(__file__).resolve().parent.parent.parent.parent
     DATA_DIR: ClassVar[Path] = BASE_DIR / "data"
     CONFIG_PATH: ClassVar[Path] = BASE_DIR / "config.yaml"
+    MODELS_DIR: ClassVar[Path] = BASE_DIR / "models"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

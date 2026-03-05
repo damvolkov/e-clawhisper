@@ -1,4 +1,4 @@
-"""OpenFang agent adapter — persistent WebSocket with background receive."""
+"""OpenFang LLM adapter — persistent WebSocket with background receive."""
 
 from __future__ import annotations
 
@@ -11,19 +11,14 @@ import orjson
 import websockets
 from websockets.asyncio.client import ClientConnection
 
-from e_clawhisper.daemon.core.interfaces.agent import AgentBase
-from e_clawhisper.shared.logger import LogIcon, logger
+from e_clawhisper.shared.logger import logger
 from e_clawhisper.shared.settings import OpenFangConfig
 
 _RESPONSE_TYPES = frozenset({"text_delta", "response", "typing", "tool_start", "tool_result", "phase"})
 
 
-class OpenFangAdapter(AgentBase):
-    """Persistent WebSocket to OpenFang agent with background message dispatch.
-
-    Background recv loop separates unsolicited messages (agents_updated,
-    pings) from response messages, which are queued for send_message().
-    """
+class LLMAdapter:
+    """Persistent WebSocket to OpenFang agent with background message dispatch."""
 
     __slots__ = ("_host", "_port", "_timeout", "_base_url", "_ws", "_agent_id", "_response_queue", "_recv_task")
 
@@ -51,10 +46,10 @@ class OpenFangAdapter(AgentBase):
         connected_msg = await self._ws.recv()
         data = orjson.loads(connected_msg)
         if data.get("type") != "connected":
-            logger.warning("openfang unexpected connect: %s", data, icon=LogIcon.AGENT)
+            logger.warning(f"LLM unexpected connect: {data}")
 
         self._recv_task = asyncio.create_task(self._receive_loop())
-        logger.info("openfang_connected agent_id=%s", agent_id[:12], icon=LogIcon.AGENT)
+        logger.system("OK", f"LLM connected agent_id={agent_id[:12]}")
 
     async def disconnect(self) -> None:
         if self._recv_task:
@@ -66,7 +61,7 @@ class OpenFangAdapter(AgentBase):
             with contextlib.suppress(websockets.exceptions.ConnectionClosed):
                 await self._ws.close()
             self._ws = None
-            logger.info("openfang_disconnected", icon=LogIcon.AGENT)
+            logger.system("STOP", "LLM disconnected")
 
     async def is_connected(self) -> bool:
         return self._ws is not None and self._recv_task is not None
@@ -74,7 +69,6 @@ class OpenFangAdapter(AgentBase):
     ##### RECEIVE LOOP #####
 
     async def _receive_loop(self) -> None:
-        """Background loop: dispatch incoming messages by type."""
         assert self._ws is not None
         try:
             async for raw in self._ws:
@@ -83,33 +77,30 @@ class OpenFangAdapter(AgentBase):
 
                 if msg_type in _RESPONSE_TYPES:
                     await self._response_queue.put(data)
-                elif msg_type in ("agents_updated", "connected"):
-                    logger.debug("openfang_broadcast: %s (ignored)", msg_type, icon=LogIcon.AGENT)
-                else:
-                    logger.debug("openfang_unknown: %s", msg_type, icon=LogIcon.AGENT)
+                elif msg_type not in ("agents_updated", "connected"):
+                    logger.turn_debug("AGENT", f"unknown: {msg_type}")
         except websockets.exceptions.ConnectionClosed:
-            logger.warning("openfang_connection_lost — reconnect needed", icon=LogIcon.AGENT)
+            logger.warning("LLM connection lost")
 
     ##### MESSAGING #####
 
     async def send_message(self, text: str) -> AsyncIterator[str]:
-        """Send plain text message, yield streaming response chunks from queue."""
+        """Send text, yield streaming response chunks."""
         if not self._ws:
-            msg = "OpenFang WebSocket not connected"
+            msg = "LLM WebSocket not connected"
             raise ConnectionError(msg)
 
         while not self._response_queue.empty():
             self._response_queue.get_nowait()
 
         await self._ws.send(text)
-        logger.debug("openfang_send: %s", text[:100], icon=LogIcon.AGENT)
 
         full_response = ""
         while True:
             try:
                 data = await asyncio.wait_for(self._response_queue.get(), timeout=self._timeout)
             except TimeoutError:
-                logger.warning("openfang response timeout after %.0fs", self._timeout, icon=LogIcon.AGENT)
+                logger.warning(f"LLM response timeout after {self._timeout:.0f}s")
                 break
 
             match data.get("type", ""):
@@ -124,7 +115,7 @@ class OpenFangAdapter(AgentBase):
                 case "typing" | "phase":
                     continue
                 case "tool_start" | "tool_result":
-                    logger.debug("openfang_tool: %s", data.get("type"), icon=LogIcon.AGENT)
+                    logger.turn_debug("AGENT", f"tool: {data.get('type')}")
 
     ##### RESOLUTION #####
 
@@ -141,7 +132,7 @@ class OpenFangAdapter(AgentBase):
             for agent in agents:
                 if agent.get("name", "").lower() == agent_name.lower():
                     agent_id = agent["id"]
-                    logger.info("resolved agent '%s' -> %s", agent_name, agent_id[:12], icon=LogIcon.AGENT)
+                    logger.system("OK", f"resolved agent '{agent_name}' → {agent_id[:12]}")
                     return str(agent_id)
 
         msg = f"Agent '{agent_name}' not found on OpenFang at {self._base_url}"

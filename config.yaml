@@ -4,6 +4,18 @@ agent:
   name: damien
   backend: openfang
 
+sentinel:
+  energy_floor: 0.01
+  vad_threshold: 0.5
+  wakeword:
+    model: alexa
+    threshold: 0.5
+
+vad:
+  threshold: 0.5
+  silence_duration: 1.5
+  min_recording_time: 1.0
+
 backends:
   openfang:
     host: 127.0.0.1
@@ -24,14 +36,12 @@ tts:
     port: 10200
     sample_rate: 22050
 
-vad:
-  backend: ten_vad
-  threshold: 0.5
-  silence_duration: 1.5
-  min_recording_time: 1.0
-
 audio:
   sample_rate: 16000
   channels: 1
   chunk_size: 512
   pre_roll_seconds: 2.0
+
+logging:
+  idle_interval: 0.5
+  turn_interval: 0.5

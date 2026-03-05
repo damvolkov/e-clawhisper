@@ -10,12 +10,11 @@ from wyoming.audio import AudioChunk, AudioStop
 from wyoming.client import AsyncTcpClient
 from wyoming.tts import Synthesize
 
-from e_clawhisper.daemon.core.interfaces.tts import TTSBase
-from e_clawhisper.shared.logger import LogIcon, logger
+from e_clawhisper.shared.logger import logger
 from e_clawhisper.shared.settings import PiperConfig
 
 
-class PiperAdapter(TTSBase):
+class TTSAdapter:
     """TTS via Piper Wyoming protocol."""
 
     __slots__ = ("_host", "_port", "_sample_rate", "_stopped")
@@ -38,7 +37,7 @@ class PiperAdapter(TTSBase):
 
         try:
             await client.write_event(Synthesize(text=text).event())
-            logger.debug("tts_synthesize: %s", text[:80], icon=LogIcon.TTS)
+            logger.turn("TTS", f"synthesizing: {logger.truncate(text)}")
 
             while not self._stopped:
                 if (event := await client.read_event()) is None:

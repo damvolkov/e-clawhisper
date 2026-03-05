@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from e_clawhisper.daemon.adapters.tts.piper import PiperAdapter
+from e_clawhisper.daemon.adapters.tts import TTSAdapter
 from e_clawhisper.shared.settings import PiperConfig
 
 _CONFIG = PiperConfig(host="localhost", port=10200, sample_rate=22050)
@@ -31,7 +31,7 @@ async def _piper_available() -> bool:
     return True
 
 
-async def _synthesize_full(adapter: PiperAdapter, text: str) -> tuple[bytes, np.ndarray, float]:
+async def _synthesize_full(adapter: TTSAdapter, text: str) -> tuple[bytes, np.ndarray, float]:
     """Synthesize text, return (raw_pcm, int16_array, duration_seconds)."""
     chunks = [chunk async for chunk in adapter.synthesize(text)]
     pcm = b"".join(chunks)
@@ -47,7 +47,7 @@ async def test_synthesize_returns_audio() -> None:
     if not await _piper_available():
         pytest.skip("Piper not available at localhost:10200")
 
-    adapter = PiperAdapter(_CONFIG)
+    adapter = TTSAdapter(_CONFIG)
     pcm, audio, duration = await _synthesize_full(adapter, "Hola, esto es una prueba")
 
     assert len(pcm) > 0, "No PCM data returned"
@@ -60,7 +60,7 @@ async def test_synthesize_longer_text_produces_more_audio() -> None:
     if not await _piper_available():
         pytest.skip("Piper not available at localhost:10200")
 
-    adapter = PiperAdapter(_CONFIG)
+    adapter = TTSAdapter(_CONFIG)
     _, _, short_dur = await _synthesize_full(adapter, "Hola")
     _, _, long_dur = await _synthesize_full(adapter, "Esta es una frase mucho más larga para comprobar que produce más audio")
 
@@ -75,7 +75,7 @@ async def test_audio_is_not_silence() -> None:
     if not await _piper_available():
         pytest.skip("Piper not available at localhost:10200")
 
-    adapter = PiperAdapter(_CONFIG)
+    adapter = TTSAdapter(_CONFIG)
     _, audio, _ = await _synthesize_full(adapter, "Probando uno dos tres")
 
     rms = np.sqrt(np.mean(audio.astype(np.float64) ** 2))
@@ -90,7 +90,7 @@ async def test_stop_interrupts_synthesis() -> None:
     if not await _piper_available():
         pytest.skip("Piper not available at localhost:10200")
 
-    adapter = PiperAdapter(_CONFIG)
+    adapter = TTSAdapter(_CONFIG)
     chunks: list[bytes] = []
 
     async for chunk in adapter.synthesize("Esta es una frase extremadamente larga que debería tardar bastante"):
@@ -115,7 +115,7 @@ async def test_multiple_sequential_synthesize() -> None:
     if not await _piper_available():
         pytest.skip("Piper not available at localhost:10200")
 
-    adapter = PiperAdapter(_CONFIG)
+    adapter = TTSAdapter(_CONFIG)
     texts = ["Primera frase", "Segunda frase", "Tercera frase"]
 
     for text in texts:

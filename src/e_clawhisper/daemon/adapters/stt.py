@@ -12,21 +12,12 @@ import orjson
 import websockets
 from websockets.asyncio.client import ClientConnection
 
-from e_clawhisper.daemon.core.interfaces.stt import STTBase
-from e_clawhisper.shared.logger import LogIcon, logger
+from e_clawhisper.shared.logger import logger
 from e_clawhisper.shared.settings import WhisperLiveConfig
 
 
-class WhisperLiveAdapter(STTBase):
-    """Streaming STT via WhisperLive WebSocket.
-
-    Connection lifecycle:
-        connect()         → initial WS, triggers model load on server
-        start_utterance() → reconnect WS for fresh session
-        stream_audio()    → send float32 audio bytes
-        finish_utterance() → END_OF_AUDIO, collect final transcript
-        disconnect()      → full teardown
-    """
+class STTAdapter:
+    """Streaming STT via WhisperLive WebSocket."""
 
     __slots__ = (
         "_ws_url",
@@ -56,17 +47,16 @@ class WhisperLiveAdapter(STTBase):
     async def connect(self) -> None:
         """Initial connection — warms up STT model on server."""
         await self._open_session()
-        logger.info("stt_connected (model warm-up) url=%s", self._ws_url, icon=LogIcon.STT)
+        logger.system("OK", f"STT connected url={self._ws_url}")
 
     async def disconnect(self) -> None:
         await self._close_session()
-        logger.info("stt_disconnected", icon=LogIcon.STT)
+        logger.system("STOP", "STT disconnected")
 
     async def start_utterance(self) -> None:
-        """Reconnect for a new utterance session (fast, model already loaded)."""
+        """Reconnect for a new utterance session."""
         await self._close_session()
         await self._open_session()
-        logger.debug("stt_utterance_started uid=%s", self._uid[:8], icon=LogIcon.STT)
 
     ##### STREAMING #####
 
@@ -85,13 +75,11 @@ class WhisperLiveAdapter(STTBase):
                 self._recv_task = None
 
         result = self._final_text
-        logger.debug("stt_final: %s", result[:120] if result else "(empty)", icon=LogIcon.STT)
         return result
 
     ##### TRANSCRIPTION #####
 
     async def _receive_loop(self) -> None:
-        """Background task: receive transcript segments from WhisperLive."""
         assert self._ws is not None
         try:
             async for msg in self._ws:
@@ -141,7 +129,7 @@ class WhisperLiveAdapter(STTBase):
         ready_msg = await self._ws.recv()
         ready = orjson.loads(ready_msg)
         if ready.get("message") != "SERVER_READY":
-            logger.warning("whisperlive unexpected ready: %s", ready, icon=LogIcon.STT)
+            logger.warning(f"STT unexpected ready: {ready}")
 
         self._ready = True
         self._recv_task = asyncio.create_task(self._receive_loop())

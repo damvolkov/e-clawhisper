@@ -9,9 +9,7 @@ import orjson
 from rich.console import Console
 from rich.table import Table
 
-from e_clawhisper.daemon.core.models import DaemonStatus
 from e_clawhisper.daemon.server import DaemonServer
-from e_clawhisper.shared.logger import configure_logging
 from e_clawhisper.shared.settings import load_config, settings
 
 app = cyclopts.App(name="session", help="Daemon lifecycle commands.")
@@ -40,7 +38,6 @@ async def _send_ipc(command: str) -> dict[str, object]:
 @app.command
 def start() -> None:
     """Start the voice daemon (foreground)."""
-    configure_logging(settings.LOG_LEVEL)
     server = DaemonServer(load_config())
     asyncio.run(server.run())
 
@@ -68,15 +65,14 @@ def status() -> None:
         console.print("[red]Invalid response data[/red]")
         return
 
-    status = DaemonStatus.model_validate(raw)
     table = Table(title="eclaw daemon status")
     table.add_column("Property", style="cyan")
     table.add_column("Value", style="green")
 
-    table.add_row("Running", str(status.running))
-    table.add_row("Pipeline State", status.pipeline_state)
-    table.add_row("Conversation Active", str(status.conversation_active))
-    table.add_row("Agent Name", status.agent_name)
-    table.add_row("Agent Backend", status.agent_backend)
+    table.add_row("Running", str(raw.get("running", False)))
+    table.add_row("Phase", str(raw.get("phase", "unknown")))
+    table.add_row("Agent", str(raw.get("agent_name", "")))
+    table.add_row("Backend", str(raw.get("agent_backend", "")))
+    table.add_row("Wakeword", str(raw.get("wakeword", "")))
 
     console.print(table)

@@ -10,7 +10,7 @@ import asyncio
 
 import pytest
 
-from e_clawhisper.daemon.adapters.agents.openfang import OpenFangAdapter
+from e_clawhisper.daemon.adapters.llm import LLMAdapter
 from e_clawhisper.shared.settings import OpenFangConfig
 
 _CONFIG = OpenFangConfig(host="127.0.0.1", port=4200, timeout=30.0)
@@ -43,7 +43,7 @@ async def test_resolve_agent_id() -> None:
     if not await _check_openfang_available():
         pytest.skip("OpenFang not available at 127.0.0.1:4200")
 
-    adapter = OpenFangAdapter(_CONFIG)
+    adapter = LLMAdapter(_CONFIG)
     agent_id = await adapter.resolve_agent_id(_AGENT_NAME)
 
     assert agent_id
@@ -58,7 +58,7 @@ async def test_connect_and_disconnect() -> None:
     if not await _check_openfang_available():
         pytest.skip("OpenFang not available at 127.0.0.1:4200")
 
-    adapter = OpenFangAdapter(_CONFIG)
+    adapter = LLMAdapter(_CONFIG)
     agent_id = await adapter.resolve_agent_id(_AGENT_NAME)
     await adapter.connect(agent_id)
 
@@ -80,7 +80,7 @@ async def test_send_message_streaming() -> None:
     if not await _check_openfang_available():
         pytest.skip("OpenFang not available at 127.0.0.1:4200")
 
-    adapter = OpenFangAdapter(_CONFIG)
+    adapter = LLMAdapter(_CONFIG)
     agent_id = await adapter.resolve_agent_id(_AGENT_NAME)
     await adapter.connect(agent_id)
 
@@ -108,7 +108,7 @@ async def test_recv_loop_survives_idle_period() -> None:
     if not await _check_openfang_available():
         pytest.skip("OpenFang not available at 127.0.0.1:4200")
 
-    adapter = OpenFangAdapter(_CONFIG)
+    adapter = LLMAdapter(_CONFIG)
     agent_id = await adapter.resolve_agent_id(_AGENT_NAME)
     await adapter.connect(agent_id)
 
@@ -137,7 +137,7 @@ async def test_multiple_messages_sequential() -> None:
     if not await _check_openfang_available():
         pytest.skip("OpenFang not available at 127.0.0.1:4200")
 
-    adapter = OpenFangAdapter(_CONFIG)
+    adapter = LLMAdapter(_CONFIG)
     agent_id = await adapter.resolve_agent_id(_AGENT_NAME)
     await adapter.connect(agent_id)
 

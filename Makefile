@@ -1,4 +1,4 @@
-.PHONY: install sync lint type test check start stop status infra down help
+.PHONY: install sync lint type test check start stop status infra down script help
 
 install: ## Install all dependencies
 	uv sync --dev
@@ -36,5 +36,12 @@ infra: ## Start STT + TTS infrastructure
 down: ## Stop infrastructure
 	docker compose -f compose.infra.yml down
 
+script: ## Run a test script (e.g. make script vad_streaming)
+	@uv run python tests/scripts/$(filter-out $@,$(MAKECMDGOALS)).py
+
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+%: ## Catch-all for script arguments
+	@:
+

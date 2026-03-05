@@ -1,0 +1,31 @@
+augmentation_batch_size: 16
+augmentation_rounds: 1
+background_paths:
+- /home/damien/workspaces/damien/openWakeWord/oww_trainer/datasets/base/audioset_16k
+background_paths_duplication_rate:
+- 1
+batch_n_per_class:
+  ACAV100M_sample: 1024
+  adversarial_negative: 50
+  positive: 50
+custom_negative_phrases: []
+false_positive_validation_data_path: /home/damien/workspaces/damien/openWakeWord/oww_trainer/datasets/base/validation_set_features.npy
+feature_data_files:
+  ACAV100M_sample: /home/damien/workspaces/damien/openWakeWord/oww_trainer/datasets/base/openwakeword_features_ACAV100M_2000_hrs_16bit.npy
+layer_size: 32
+max_negative_weight: 1500
+model_name: eager
+model_type: dnn
+n_samples: 5000
+n_samples_val: 1000
+output_dir: /home/damien/workspaces/damien/openWakeWord/oww_trainer/datasets/eager
+piper_sample_generator_path: /home/damien/workspaces/damien/openWakeWord/oww_trainer/models/base/piper-sample-generator
+rir_paths:
+- /home/damien/workspaces/damien/openWakeWord/oww_trainer/datasets/base/mit_rirs
+steps: 10000
+target_accuracy: 0.6
+target_false_positives_per_hour: 0.2
+target_phrase:
+- eager
+target_recall: 0.25
+tts_batch_size: 50

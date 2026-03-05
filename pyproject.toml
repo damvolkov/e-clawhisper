@@ -10,11 +10,10 @@ readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "MIT" }
 authors = [{ name = "Eager", email = "dev@eager.dev" }]
-keywords = ["voice", "stt", "tts", "vad", "wake-word", "daemon", "openfang", "ten-vad"]
+keywords = ["voice", "stt", "tts", "vad", "wake-word", "daemon", "openfang", "silero"]
 
 dependencies = [
     "cyclopts>=3.6.0",
-    "ten-vad",
     "websockets>=12.0",
     "wyoming>=1.8.0",
     "sounddevice>=0.5.0",
@@ -25,8 +24,10 @@ dependencies = [
     "structlog>=25.0.0",
     "httpx>=0.28.1",
     "pyyaml>=6.0.0",
-    "aiofiles>=25.0.0",
     "rich>=14.0.0",
+    "onnxruntime>=1.24.0",
+    "openwakeword>=0.4.0",
+    "silero-vad>=6.2.1",
 ]
 
 [project.scripts]
@@ -39,7 +40,6 @@ dev = [
     "ruff>=0.14.0",
     "pre-commit>=4.4.0",
     "ty>=0.0.5",
-    "respx>=0.22.0",
 ]
 
 [tool.hatch.version]
@@ -79,5 +79,3 @@ root = ["./src/e_clawhisper"]
 possibly-unresolved-reference = "error"
 unresolved-import = "error"
 
-[tool.uv.sources]
-ten-vad = { git = "https://github.com/TEN-framework/ten-vad.git" }
