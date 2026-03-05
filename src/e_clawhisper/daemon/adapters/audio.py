@@ -1,4 +1,4 @@
-"""Audio I/O — async mic capture and speaker playback via sounddevice."""
+"""Audio I/O adapter — async mic capture and streaming speaker playback."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from e_clawhisper.shared.settings import AudioConfig
 
 
 class AudioAdapter:
-    """Async mic input + streaming speaker output. Bridges PortAudio thread with asyncio."""
+    """Bridges PortAudio thread with asyncio for mic input and PCM output."""
 
     __slots__ = (
         "_sample_rate",
@@ -52,7 +52,6 @@ class AudioAdapter:
             self._queue.put_nowait(data)
 
     def _audio_callback(self, indata: np.ndarray, frames: int, time_info: object, status: sd.CallbackFlags) -> None:
-        """PortAudio callback → float32 enqueue on event loop (matches script)."""
         audio_f32 = indata[:, 0].astype(np.float32) if indata.dtype != np.float32 else indata[:, 0].copy()
         if self._loop is not None:
             with contextlib.suppress(RuntimeError):
@@ -76,13 +75,10 @@ class AudioAdapter:
             self._stream = None
         self._loop = None
 
-    async def read_chunk(self) -> np.ndarray:
-        return await self._queue.get()
-
     ##### PLAYBACK #####
 
-    async def play_pcm_queue(self, pcm_queue: asyncio.Queue[bytes | None], sample_rate: int) -> float:
-        """Consume PCM int16 chunks from queue → speaker. Returns total seconds played."""
+    async def play(self, pcm_queue: asyncio.Queue[bytes | None], sample_rate: int) -> float:
+        """Consume PCM int16 chunks from queue → speaker. Returns seconds played."""
         self._playback_stopped = False
         loop = asyncio.get_running_loop()
         total_samples = 0
@@ -94,16 +90,13 @@ class AudioAdapter:
                 if self._playback_stopped:
                     break
                 await loop.run_in_executor(None, out.write, pcm_chunk)
-                total_samples += len(pcm_chunk) // 2  # int16 = 2 bytes per sample
+                total_samples += len(pcm_chunk) // 2
         finally:
             with contextlib.suppress(sd.PortAudioError):
                 out.stop()
                 out.close()
 
         return total_samples / sample_rate
-
-    def play_audio(self, audio_data: np.ndarray, sample_rate: int | None = None) -> None:
-        sd.play(audio_data, samplerate=sample_rate or self._sample_rate)
 
     def stop_playback(self) -> None:
         self._playback_stopped = True

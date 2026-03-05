@@ -6,10 +6,10 @@ Usage: make script sentinel
 from __future__ import annotations
 
 import sys
-import time
 import threading
-from enum import StrEnum, auto
+import time
 from concurrent.futures import ThreadPoolExecutor
+from enum import StrEnum, auto
 from queue import SimpleQueue
 
 import numpy as np

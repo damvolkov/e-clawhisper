@@ -10,7 +10,6 @@ from wyoming.audio import AudioChunk, AudioStop
 from wyoming.client import AsyncTcpClient
 from wyoming.tts import Synthesize
 
-from e_clawhisper.shared.logger import logger
 from e_clawhisper.shared.settings import PiperConfig
 
 
@@ -30,14 +29,13 @@ class TTSAdapter:
         return self._sample_rate
 
     async def synthesize(self, text: str) -> AsyncIterator[bytes]:
-        """Connect to Piper, send text, yield PCM audio chunks."""
+        """Yield PCM int16 audio chunks for given text."""
         self._stopped = False
         client = AsyncTcpClient(self._host, self._port)
         await client.connect()
 
         try:
             await client.write_event(Synthesize(text=text).event())
-            logger.turn("TTS", f"synthesizing: {logger.truncate(text)}")
 
             while not self._stopped:
                 if (event := await client.read_event()) is None:

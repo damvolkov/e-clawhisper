@@ -66,7 +66,7 @@ class LLMAdapter:
     async def is_connected(self) -> bool:
         return self._ws is not None and self._recv_task is not None
 
-    ##### RECEIVE LOOP #####
+    ##### RECEIVE #####
 
     async def _receive_loop(self) -> None:
         assert self._ws is not None
@@ -84,8 +84,7 @@ class LLMAdapter:
 
     ##### MESSAGING #####
 
-    async def send_message(self, text: str) -> AsyncIterator[str]:
-        """Send text, yield streaming response chunks."""
+    async def send(self, text: str) -> AsyncIterator[str]:
         if not self._ws:
             msg = "LLM WebSocket not connected"
             raise ConnectionError(msg)
@@ -120,7 +119,6 @@ class LLMAdapter:
     ##### RESOLUTION #####
 
     async def resolve_agent_id(self, agent_name: str) -> str:
-        """GET /api/agents and find agent by name."""
         async with httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout) as client:
             resp = await client.get("/api/agents")
             resp.raise_for_status()

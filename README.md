@@ -37,7 +37,7 @@ Mic → [SENTINEL: Energy → Silero VAD ‖ OpenWakeWord] → wakeword!
                         │         ┌──────────────────────────┐                 │
                         │         │ Audio Adapter (shared)   │                 │
                         │         │ Mic → asyncio.Queue      │                 │
-                        │         │ Speaker ← play_audio()   │                 │
+                        │         │ Speaker ← play_pcm_queue │                 │
                         │         └──────────────────────────┘                 │
                         └──────────────────────────────────────────────────────┘
                                   │              │             │
@@ -68,8 +68,14 @@ Executes one complete turn cycle:
 
 1. **STT streaming ‖ VAD end-of-speech** — audio flows to WhisperLive while Silero VAD tracks silence duration
 2. **Transcript** — STT finalizes when VAD detects end-of-speech
-3. **LLM** — transcript sent to OpenFang agent, streaming response collected
-4. **TTS → Speaker** — Piper synthesizes response, audio played back
+3. **3-stage streaming pipeline** — three concurrent `create_task` stages connected by `asyncio.Queue`:
+
+```
+LLM text_delta → sentence_queue → TTS.synthesize → pcm_queue → sd.RawOutputStream
+     stage 1                          stage 2                      stage 3
+```
+
+While sentence N plays, TTS synthesizes N+1, and LLM generates N+2.
 
 Returns `TurnComplete` or `TurnError` → orchestrator transitions back to SENTINEL.
 

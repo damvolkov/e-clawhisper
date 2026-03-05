@@ -76,7 +76,7 @@ async def test_producer_yields_sentences_from_chunks() -> None:
         for chunk in ["Hello ", "world. ", "How are ", "you? ", "Fine."]:
             yield chunk
 
-    llm.send_message = _fake_send_message
+    llm.send = _fake_send_message
     pipeline = _make_pipeline(llm)
 
     sentences = await _collect_sentences(pipeline, "test")
@@ -91,7 +91,7 @@ async def test_producer_flushes_remaining_buffer() -> None:
         for chunk in ["No punctuation ", "at the end"]:
             yield chunk
 
-    llm.send_message = _fake_send_message
+    llm.send = _fake_send_message
     pipeline = _make_pipeline(llm)
 
     sentences = await _collect_sentences(pipeline, "test")
@@ -106,7 +106,7 @@ async def test_producer_handles_newline_splits() -> None:
         for chunk in ["Line one\n", "Line two\n", "Line three"]:
             yield chunk
 
-    llm.send_message = _fake_send_message
+    llm.send = _fake_send_message
     pipeline = _make_pipeline(llm)
 
     sentences = await _collect_sentences(pipeline, "test")
@@ -121,7 +121,7 @@ async def test_producer_empty_response() -> None:
         return
         yield  # make it an async generator
 
-    llm.send_message = _fake_send_message
+    llm.send = _fake_send_message
     pipeline = _make_pipeline(llm)
 
     sentences = await _collect_sentences(pipeline, "test")

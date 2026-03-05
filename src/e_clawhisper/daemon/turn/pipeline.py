@@ -60,10 +60,8 @@ class TurnPipeline:
         self._tts_sample_rate = tts_sample_rate
         self._running = False
 
-    ##### PUBLIC #####
-
     async def run(self, audio: AudioAdapter) -> TurnComplete | TurnError:
-        """Execute one turn cycle. Returns event for orchestrator."""
+        """Execute one turn cycle."""
         self._running = True
         self._vad.reset()
         turn = Turn()
@@ -77,7 +75,7 @@ class TurnPipeline:
             while self._running:
                 audio_chunk = await audio.queue.get()
 
-                stt_task = asyncio.create_task(self._stt.stream_audio(audio_chunk.tobytes()))
+                stt_task = asyncio.create_task(self._stt.stream(audio_chunk.tobytes()))
                 vad_result = await loop.run_in_executor(self._executor, self._vad.process, audio_chunk)
                 await stt_task
 
@@ -116,10 +114,10 @@ class TurnPipeline:
     def shutdown(self) -> None:
         self._executor.shutdown(wait=False)
 
-    ##### STREAMING STAGES #####
+    ##### STREAMING #####
 
     async def _stream_response(self, transcript: str, audio: AudioAdapter) -> str:
-        """Orchestrate 3 concurrent stages: LLM → TTS → speaker."""
+        """3 concurrent stages: LLM → sentence_queue → TTS → pcm_queue → speaker."""
         logger.turn("AGENT", f"query: {logger.truncate(transcript)}")
 
         sentence_queue: asyncio.Queue[str | None] = asyncio.Queue()
@@ -131,7 +129,7 @@ class TurnPipeline:
             self._stage_tts_to_pcm(sentence_queue, pcm_queue, response_parts)
         )
         stage_speaker = asyncio.create_task(
-            audio.play_pcm_queue(pcm_queue, self._tts_sample_rate)
+            audio.play(pcm_queue, self._tts_sample_rate)
         )
 
         duration = 0.0
@@ -152,10 +150,10 @@ class TurnPipeline:
         transcript: str,
         sentence_queue: asyncio.Queue[str | None],
     ) -> None:
-        """Stage 1: LLM text_delta → sentence boundary detection → sentence_queue."""
+        """LLM text_delta → sentence boundary → sentence_queue."""
         buffer = ""
         try:
-            async for chunk in self._llm.send_message(transcript):
+            async for chunk in self._llm.send(transcript):
                 buffer += chunk
 
                 while (m := _SENTENCE_RE.search(buffer)) is not None:
@@ -176,7 +174,7 @@ class TurnPipeline:
         pcm_queue: asyncio.Queue[bytes | None],
         response_parts: list[str],
     ) -> None:
-        """Stage 2: sentence_queue → TTS synthesize → pcm_queue."""
+        """sentence_queue → TTS synthesize → pcm_queue."""
         try:
             while (sentence := await sentence_queue.get()) is not _SENTINEL:
                 if not self._running:

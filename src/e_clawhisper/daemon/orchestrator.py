@@ -72,7 +72,6 @@ class Orchestrator:
     ##### LIFECYCLE #####
 
     async def start(self) -> None:
-        """Connect adapters, run state machine loop."""
         self._running = True
 
         logger.system("START", f"resolving agent '{self._config.agent.name}'...")
@@ -111,7 +110,6 @@ class Orchestrator:
                     await self._run_turn()
 
     async def _run_sentinel(self) -> None:
-        """Run sentinel until wakeword detected."""
         logger.set_pipeline("SENTINEL")
         await self._sentinel.run(self._audio.queue)
 
@@ -119,7 +117,6 @@ class Orchestrator:
             self._phase = PipelinePhase.TURN
 
     async def _run_turn(self) -> None:
-        """Run single turn cycle, then back to sentinel."""
         logger.set_pipeline("TURN")
 
         result = await self._turn.run(audio=self._audio)

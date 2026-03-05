@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from collections.abc import AsyncIterator
 from uuid import uuid4
 
 import numpy as np
@@ -25,7 +24,6 @@ class STTAdapter:
         "_language",
         "_ws",
         "_uid",
-        "_transcript_queue",
         "_recv_task",
         "_final_text",
         "_ready",
@@ -37,7 +35,6 @@ class STTAdapter:
         self._language = config.language
         self._ws: ClientConnection | None = None
         self._uid: str = ""
-        self._transcript_queue: asyncio.Queue[str] = asyncio.Queue()
         self._recv_task: asyncio.Task[None] | None = None
         self._final_text: str = ""
         self._ready = False
@@ -45,7 +42,6 @@ class STTAdapter:
     ##### CONNECTION #####
 
     async def connect(self) -> None:
-        """Initial connection — warms up STT model on server."""
         await self._open_session()
         logger.system("OK", f"STT connected url={self._ws_url}")
 
@@ -54,18 +50,16 @@ class STTAdapter:
         logger.system("STOP", "STT disconnected")
 
     async def start_utterance(self) -> None:
-        """Reconnect for a new utterance session."""
         await self._close_session()
         await self._open_session()
 
     ##### STREAMING #####
 
-    async def stream_audio(self, audio_chunk: bytes) -> None:
+    async def stream(self, audio_chunk: bytes) -> None:
         if self._ws and self._ready:
             await self._ws.send(audio_chunk)
 
     async def finish_utterance(self) -> str:
-        """Send END_OF_AUDIO and return accumulated transcript."""
         if self._ws:
             with contextlib.suppress(websockets.exceptions.ConnectionClosed):
                 await self._ws.send('{"type": "END_OF_AUDIO"}')
@@ -74,10 +68,9 @@ class STTAdapter:
                     await asyncio.wait_for(self._recv_task, timeout=5.0)
                 self._recv_task = None
 
-        result = self._final_text
-        return result
+        return self._final_text
 
-    ##### TRANSCRIPTION #####
+    ##### RECEIVE #####
 
     async def _receive_loop(self) -> None:
         assert self._ws is not None
@@ -85,33 +78,24 @@ class STTAdapter:
             async for msg in self._ws:
                 data = orjson.loads(msg)
                 if "segments" in data:
-                    text = " ".join(seg_text for seg in data["segments"] if (seg_text := seg.get("text", "").strip()))
+                    text = " ".join(
+                        seg_text
+                        for seg in data["segments"]
+                        if (seg_text := seg.get("text", "").strip())
+                    )
                     if text:
                         self._final_text = text
-                        with contextlib.suppress(asyncio.QueueFull):
-                            self._transcript_queue.put_nowait(text)
                 if data.get("eos"):
                     break
         except websockets.exceptions.ConnectionClosed:
             pass
 
-    async def transcript_stream(self) -> AsyncIterator[str]:
-        while True:
-            try:
-                yield await asyncio.wait_for(self._transcript_queue.get(), timeout=0.1)
-            except TimeoutError:
-                if self._ws is None:
-                    break
-
-    ##### SESSION MANAGEMENT #####
+    ##### SESSION #####
 
     async def _open_session(self) -> None:
         self._uid = str(uuid4())
         self._final_text = ""
         self._ready = False
-
-        while not self._transcript_queue.empty():
-            self._transcript_queue.get_nowait()
 
         self._ws = await websockets.connect(self._ws_url, max_size=None)
 
@@ -148,5 +132,5 @@ class STTAdapter:
 
     @staticmethod
     def audio_to_float32(audio_int16: np.ndarray) -> bytes:
-        """Convert int16 audio to float32 bytes for WhisperLive."""
+        """Convert int16 → float32 bytes for WhisperLive."""
         return (audio_int16.astype(np.float32) / 32768.0).tobytes()

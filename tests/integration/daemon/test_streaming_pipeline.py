@@ -70,7 +70,7 @@ async def test_llm_to_tts_streaming_produces_audio() -> None:
 
         print("\n  Sending: 'Dime tres cosas sobre Python. Sé breve.'")
 
-        async for chunk in llm.send_message("Dime tres cosas sobre Python. Sé breve."):
+        async for chunk in llm.send("Dime tres cosas sobre Python. Sé breve."):
             buffer += chunk
 
             while (m := sentence_re.search(buffer)) is not None:
