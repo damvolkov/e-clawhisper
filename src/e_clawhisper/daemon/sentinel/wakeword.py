@@ -57,6 +57,10 @@ class WakeWordDetector:
     def name(self) -> str:
         return self._name
 
+    @property
+    def threshold(self) -> float:
+        return self._threshold
+
     def feed(self, audio_float32: np.ndarray) -> float:
         """Feed audio chunk (float32) → return max wakeword score.
 

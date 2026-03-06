@@ -27,6 +27,10 @@ class _StubVAD:
         self._threshold = threshold
         self._probs = probs
 
+    @property
+    def threshold(self) -> float:
+        return self._threshold
+
     def __call__(self, audio: np.ndarray) -> float:
         return next(self._probs, 0.0)
 

@@ -7,7 +7,9 @@ Run with: uv run pytest tests/integration/daemon/test_streaming_pipeline.py -v -
 from __future__ import annotations
 
 import asyncio
+import re
 
+import httpx
 import pytest
 
 from e_clawhisper.daemon.adapters.agent import AgentAdapter
@@ -23,8 +25,6 @@ _AGENT_NAME = "damien"
 
 
 async def _openfang_available() -> bool:
-    import httpx
-
     try:
         async with httpx.AsyncClient(base_url="http://127.0.0.1:4200", timeout=3.0) as client:
             resp = await client.get("/api/agents")
@@ -60,8 +60,6 @@ async def test_agent_to_tts_streaming_produces_audio() -> None:
 
     try:
         # Stream agent response with sentence splitting
-        import re
-
         sentence_re = re.compile(r"(?<=[.!?])\s+|\n")
         buffer = ""
         sentences: list[str] = []

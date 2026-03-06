@@ -223,7 +223,8 @@ src/e_clawhisper/
 │       ├── audio.py                 Mic/Speaker (sounddevice)
 │       ├── stt.py                   WhisperLive WebSocket
 │       ├── tts.py                   Piper Wyoming TCP
-│       └── llm.py                   OpenFang WebSocket + REST
+│       ├── agent.py                 OpenFang WebSocket + REST
+│       └── base.py                  Adapter protocols (STTPort, TTSPort, AgentPort)
 └── shared/
     ├── settings.py                  Env (Settings) + YAML (AppConfig)
     ├── logger.py                    Pipeline-prefixed colored logging

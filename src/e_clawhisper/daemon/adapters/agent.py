@@ -69,7 +69,8 @@ class AgentAdapter:
     ##### RECEIVE #####
 
     async def _receive_loop(self) -> None:
-        assert self._ws is not None
+        if self._ws is None:
+            return
         try:
             async for raw in self._ws:
                 data: dict[str, object] = orjson.loads(raw)
@@ -83,6 +84,10 @@ class AgentAdapter:
             self._ws = None
             await self._response_queue.put({"type": "connection_lost"})
             logger.warning("agent connection lost")
+        except Exception as exc:
+            self._ws = None
+            await self._response_queue.put({"type": "connection_lost"})
+            logger.error(f"agent receive error: {exc}")
 
     ##### MESSAGING #####
 

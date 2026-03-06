@@ -51,7 +51,7 @@ class EndOfSpeechDetector:
     def process(self, audio: np.ndarray) -> EndOfSpeechResult:
         """Process 512-sample chunk → (is_speech, should_stop, probability)."""
         prob = self._vad(audio)
-        is_speech = prob >= self._vad._threshold
+        is_speech = prob >= self._vad.threshold
 
         if is_speech:
             if not self._has_speech:

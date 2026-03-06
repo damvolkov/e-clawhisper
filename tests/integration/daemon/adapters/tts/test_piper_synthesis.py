@@ -6,6 +6,8 @@ Run with: uv run pytest tests/integration/daemon/adapters/tts/ -v -s
 
 from __future__ import annotations
 
+import asyncio
+
 import numpy as np
 import pytest
 
@@ -20,8 +22,6 @@ _SAMPLE_RATE = 22050
 
 
 async def _piper_available() -> bool:
-    import asyncio
-
     try:
         _, writer = await asyncio.wait_for(asyncio.open_connection("localhost", 10200), timeout=2.0)
         writer.close()

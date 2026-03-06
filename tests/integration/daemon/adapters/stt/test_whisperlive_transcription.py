@@ -73,7 +73,7 @@ async def _transcribe(audio_16k: np.ndarray, speed: float = 1.5) -> str:
 
         for i in range(0, len(audio_16k), chunk_size):
             chunk = audio_16k[i : i + chunk_size]
-            await stt.stream_audio(STTAdapter.audio_to_float32(chunk))
+            await stt.stream(STTAdapter.audio_to_float32(chunk))
             await asyncio.sleep(sleep_per_chunk)
 
         await asyncio.sleep(1.0)

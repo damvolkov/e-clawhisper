@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 
+import httpx
 import pytest
 
 from e_clawhisper.daemon.adapters.agent import AgentAdapter
@@ -26,8 +27,6 @@ pytestmark = pytest.mark.skipif(
 
 
 async def _check_openfang_available() -> bool:
-    import httpx
-
     try:
         async with httpx.AsyncClient(base_url="http://127.0.0.1:4200", timeout=3.0) as client:
             resp = await client.get("/api/agents")

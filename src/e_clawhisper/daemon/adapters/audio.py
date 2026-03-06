@@ -1,9 +1,10 @@
-"""Audio I/O adapter — async mic capture and streaming speaker playback."""
+"""Audio I/O adapter — async mic capture and callback-based speaker playback."""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
+from collections import deque
 
 import numpy as np
 import sounddevice as sd
@@ -18,6 +19,7 @@ class AudioAdapter:
         "_sample_rate",
         "_channels",
         "_chunk_size",
+        "_playback_latency",
         "_queue",
         "_stream",
         "_loop",
@@ -28,6 +30,7 @@ class AudioAdapter:
         self._sample_rate = config.sample_rate
         self._channels = config.channels
         self._chunk_size = config.chunk_size
+        self._playback_latency = config.playback_latency
         self._queue: asyncio.Queue[np.ndarray] = asyncio.Queue(maxsize=config.queue_size)
         self._stream: sd.InputStream | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -78,18 +81,52 @@ class AudioAdapter:
     ##### PLAYBACK #####
 
     async def play(self, pcm_queue: asyncio.Queue[bytes | None], sample_rate: int) -> float:
-        """Consume PCM int16 chunks from queue → speaker. Returns seconds played."""
+        """Consume PCM int16 chunks from queue → callback-based speaker. Returns seconds played.
+
+        Uses PortAudio callback API: the callback pulls from a deque and
+        writes silence when empty — eliminates xrun and thread-safety issues.
+        """
         self._playback_stopped = False
         total_samples = 0
 
-        out = sd.RawOutputStream(samplerate=sample_rate, channels=1, dtype="int16")
+        # Thread-safe buffer: asyncio appends, PortAudio callback consumes
+        chunks: deque[bytes] = deque()
+        offset = [0]
+        silence = bytes(sample_rate * 2)  # 1s pre-allocated int16 silence
+
+        def _fill_output(
+            outdata: memoryview, frames: int, _time: object, _status: sd.CallbackFlags,
+        ) -> None:
+            needed = frames * 2  # int16 mono = 2 bytes/frame
+            pos = 0
+            while pos < needed and chunks:
+                chunk = chunks[0]
+                available = len(chunk) - offset[0]
+                n = min(available, needed - pos)
+                outdata[pos : pos + n] = chunk[offset[0] : offset[0] + n]
+                pos += n
+                offset[0] += n
+                if offset[0] >= len(chunk):
+                    chunks.popleft()
+                    offset[0] = 0
+            if pos < needed:
+                outdata[pos:needed] = silence[: needed - pos]
+
+        out = sd.RawOutputStream(
+            samplerate=sample_rate, channels=1, dtype="int16",
+            latency=self._playback_latency, callback=_fill_output,
+        )
         out.start()
         try:
-            while (pcm_chunk := await pcm_queue.get()) is not None:
-                if self._playback_stopped:
+            while not self._playback_stopped:
+                pcm_chunk = await pcm_queue.get()
+                if pcm_chunk is None:
                     break
-                await asyncio.to_thread(out.write, pcm_chunk)
+                chunks.append(pcm_chunk)
                 total_samples += len(pcm_chunk) // 2
+            # Drain: wait for callback to consume remaining chunks
+            while chunks and not self._playback_stopped:
+                await asyncio.sleep(0.05)
         finally:
             with contextlib.suppress(sd.PortAudioError):
                 out.stop()

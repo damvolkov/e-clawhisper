@@ -88,13 +88,13 @@ class SentinelPipeline:
             vad_prob = await vad_future
             ww_score = await ww_future
 
-            if vad_prob < self._vad._threshold:
+            if vad_prob < self._vad.threshold:
                 logger.sentinel_debug("NOISE", vad=f"{vad_prob:.2f}", e=f"{energy:.4f}")
                 continue
 
             logger.sentinel_debug("VOICE", vad=f"{vad_prob:.2f}", e=f"{energy:.4f}")
 
-            if ww_score >= self._ww._threshold:
+            if ww_score >= self._ww.threshold:
                 logger.sentinel("WAKEWORD", f"'{self._ww.name}' detected", ww=f"{ww_score:.2f}")
                 self.last_event = WakewordEvent(
                     timestamp=monotonic(),
@@ -106,3 +106,4 @@ class SentinelPipeline:
 
     async def stop(self) -> None:
         self._running = False
+        self._executor.shutdown(wait=False)

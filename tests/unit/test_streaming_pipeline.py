@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 from e_clawhisper.daemon.adapters.agent import AgentAdapter
 from e_clawhisper.daemon.adapters.audio import AudioAdapter
 from e_clawhisper.daemon.adapters.stt import STTAdapter
@@ -14,6 +16,7 @@ from e_clawhisper.shared.settings import VADConfig
 
 _VAD_CFG = VADConfig(threshold=0.5, silence_duration=1.5, min_recording_time=1.0)
 _PCM_CHUNK = b"\x00\x01" * 100
+_DEADLOCK_TIMEOUT = 3.0
 
 
 ##### HELPERS #####
@@ -193,3 +196,148 @@ async def test_stream_response_concurrent_execution() -> None:
     assert "agent_start" in execution_order
     assert "agent_end" in execution_order
     assert any(e.startswith("tts_") for e in execution_order)
+
+
+##### RACE CONDITIONS & DEADLOCKS #####
+
+
+async def test_agent_failure_does_not_deadlock() -> None:
+    """Agent error mid-stream must cancel TTS+speaker — no infinite wait."""
+    agent = AsyncMock(spec=AgentAdapter)
+
+    async def _failing_agent(text: str):
+        yield "Hello. "
+        raise RuntimeError("agent_crashed")
+
+    agent.send = _failing_agent
+
+    tts = _make_tts(pcm_per_sentence=1)
+    pipeline = _make_pipeline(agent, tts)
+    audio = _make_audio()
+    pipeline._running = True
+
+    with pytest.raises(RuntimeError, match="agent_crashed"):
+        async with asyncio.timeout(_DEADLOCK_TIMEOUT):
+            await pipeline._stream_response("test", audio)
+
+
+async def test_tts_failure_does_not_deadlock() -> None:
+    """TTS error during synthesis must cancel agent+speaker — no infinite wait."""
+    agent = _make_agent(["First sentence. ", "Second sentence. ", "Third."])
+
+    tts = AsyncMock(spec=TTSAdapter)
+    call_count = 0
+
+    async def _failing_tts(text: str):
+        nonlocal call_count
+        call_count += 1
+        if call_count >= 2:
+            raise ConnectionError("tts_down")
+        yield _PCM_CHUNK
+
+    tts.synthesize = _failing_tts
+
+    pipeline = _make_pipeline(agent, tts)
+    audio = _make_audio()
+    pipeline._running = True
+
+    with pytest.raises(ConnectionError, match="tts_down"):
+        async with asyncio.timeout(_DEADLOCK_TIMEOUT):
+            await pipeline._stream_response("test", audio)
+
+
+async def test_speaker_failure_does_not_deadlock() -> None:
+    """Speaker error must cancel agent+tts — no infinite wait."""
+    agent = _make_agent(["Hello world. ", "More text."])
+    tts = _make_tts(pcm_per_sentence=1)
+    pipeline = _make_pipeline(agent, tts)
+
+    audio = MagicMock(spec=AudioAdapter)
+
+    async def _failing_play(pcm_queue: asyncio.Queue[bytes | None], sample_rate: int) -> float:
+        await pcm_queue.get()
+        raise OSError("speaker_broken")
+
+    audio.play = _failing_play
+    pipeline._running = True
+
+    with pytest.raises(OSError, match="speaker_broken"):
+        async with asyncio.timeout(_DEADLOCK_TIMEOUT):
+            await pipeline._stream_response("test", audio)
+
+
+async def test_agent_failure_propagates_through_run() -> None:
+    """Agent crash during run() returns TurnError (caught by run's handler), not hang."""
+    agent = AsyncMock(spec=AgentAdapter)
+
+    async def _crashing_agent(text: str):
+        yield "partial "
+        raise ConnectionError("ws_closed")
+
+    agent.send = _crashing_agent
+
+    tts = _make_tts(pcm_per_sentence=1)
+    stt = AsyncMock(spec=STTAdapter)
+    stt.finish_utterance = AsyncMock(return_value="user said something")
+    stt.start_utterance = AsyncMock()
+    stt.stream = AsyncMock()
+
+    pipeline = TurnPipeline(stt=stt, agent=agent, tts=tts, vad_config=_VAD_CFG, tts_sample_rate=16000)
+
+    audio = MagicMock(spec=AudioAdapter)
+    # Provide a queue with one VAD-triggering chunk, then stop
+    audio.queue = asyncio.Queue()
+
+    async def _fake_play(pcm_queue: asyncio.Queue[bytes | None], sample_rate: int) -> float:
+        while (await pcm_queue.get()) is not None:
+            pass
+        return 0.0
+
+    audio.play = _fake_play
+
+    # _stream_response raises the ConnectionError — run() catches it as TurnError
+    with pytest.raises(ConnectionError, match="ws_closed"):
+        async with asyncio.timeout(_DEADLOCK_TIMEOUT):
+            await pipeline._stream_response("user said something", audio)
+
+
+async def test_all_stages_cancelled_on_first_failure() -> None:
+    """Verify TaskGroup cancels sibling tasks when one fails."""
+    cancelled_stages: list[str] = []
+
+    agent = AsyncMock(spec=AgentAdapter)
+
+    async def _slow_agent(text: str):
+        try:
+            yield "Hello. "
+            await asyncio.sleep(10)  # Simulates slow streaming
+            yield "Never reached."
+        except asyncio.CancelledError:
+            cancelled_stages.append("agent")
+            raise
+
+    agent.send = _slow_agent
+
+    tts = AsyncMock(spec=TTSAdapter)
+
+    async def _ok_tts(text: str):
+        yield _PCM_CHUNK
+
+    tts.synthesize = _ok_tts
+
+    pipeline = _make_pipeline(agent, tts)
+
+    audio = MagicMock(spec=AudioAdapter)
+
+    async def _crashing_play(pcm_queue: asyncio.Queue[bytes | None], sample_rate: int) -> float:
+        await pcm_queue.get()  # get one chunk
+        raise OSError("alsa_xrun")
+
+    audio.play = _crashing_play
+    pipeline._running = True
+
+    with pytest.raises(OSError, match="alsa_xrun"):
+        async with asyncio.timeout(_DEADLOCK_TIMEOUT):
+            await pipeline._stream_response("test", audio)
+
+    assert "agent" in cancelled_stages

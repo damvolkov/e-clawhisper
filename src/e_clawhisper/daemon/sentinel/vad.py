@@ -6,6 +6,7 @@ Returns speech probability [0.0, 1.0].
 
 from __future__ import annotations
 
+import importlib
 import shutil
 from pathlib import Path
 
@@ -30,13 +31,18 @@ def _resolve_model_path() -> Path:
     if local.exists():
         return local
 
-    # Copy from silero_vad package if available
-    pkg_path = Path(__file__).resolve().parents[4] / ".venv" / "lib"
-    for candidate in pkg_path.rglob(f"silero_vad/data/{_MODEL_FILENAME}"):
-        local.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(candidate, local)
-        logger.system("OK", f"Copied silero model to {local}")
-        return local
+    # Copy from silero_vad package if installed
+    try:
+        pkg_spec = importlib.util.find_spec("silero_vad")
+        if pkg_spec and pkg_spec.origin:
+            pkg_data = Path(pkg_spec.origin).parent / "data" / _MODEL_FILENAME
+            if pkg_data.exists():
+                local.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(pkg_data, local)
+                logger.system("OK", f"Copied silero model to {local}")
+                return local
+    except (ImportError, ValueError):
+        pass
 
     # Fallback to project root
     root = settings.BASE_DIR / _MODEL_FILENAME
@@ -69,6 +75,10 @@ class SileroVAD:
         self.reset()
 
         logger.system("OK", f"SileroVAD loaded threshold={threshold}")
+
+    @property
+    def threshold(self) -> float:
+        return self._threshold
 
     def reset(self) -> None:
         self._state = np.zeros(_STATE_SHAPE, dtype=np.float32)

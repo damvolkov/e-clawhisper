@@ -17,10 +17,8 @@ import asyncio
 import re
 from concurrent.futures import ThreadPoolExecutor
 
-from e_clawhisper.daemon.adapters.agent import AgentAdapter
 from e_clawhisper.daemon.adapters.audio import AudioAdapter
-from e_clawhisper.daemon.adapters.stt import STTAdapter
-from e_clawhisper.daemon.adapters.tts import TTSAdapter
+from e_clawhisper.daemon.adapters.base import AgentPort, STTPort, TTSPort
 from e_clawhisper.daemon.turn.vad import EndOfSpeechDetector
 from e_clawhisper.shared.logger import logger
 from e_clawhisper.shared.operational.events import Turn, TurnComplete, TurnError
@@ -45,12 +43,14 @@ class TurnPipeline:
         "_running",
     )
 
+    _SENTENCE_QUEUE_SIZE: int = 10
+
     def __init__(
         self,
         *,
-        stt: STTAdapter,
-        agent: AgentAdapter,
-        tts: TTSAdapter,
+        stt: STTPort,
+        agent: AgentPort,
+        tts: TTSPort,
         vad_config: VADConfig,
         tts_sample_rate: int = 22050,
         pcm_queue_size: int = 20,
@@ -61,7 +61,7 @@ class TurnPipeline:
         self._vad = EndOfSpeechDetector(vad_config)
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._tts_sample_rate = tts_sample_rate
-        self._sentence_queue: asyncio.Queue[str | None] = asyncio.Queue()
+        self._sentence_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=self._SENTENCE_QUEUE_SIZE)
         self._pcm_queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=pcm_queue_size)
         self._running = False
 
@@ -125,6 +125,7 @@ class TurnPipeline:
 
     async def stop(self) -> None:
         self._running = False
+        self._executor.shutdown(wait=False)
 
     ##### STREAMING #####
 
@@ -135,25 +136,30 @@ class TurnPipeline:
                 q.get_nowait()
 
     async def _stream_response(self, transcript: str, audio: AudioAdapter) -> str:
-        """3 concurrent stages: Agent → sentence_queue → TTS → pcm_queue → speaker."""
+        """3 concurrent stages: Agent → sentence_queue → TTS → pcm_queue → speaker.
+
+        Uses TaskGroup for structured concurrency — if any stage fails, all others
+        are cancelled immediately, preventing deadlocks from missing sentinels.
+        """
         logger.turn("AGENT", f"query: {logger.truncate(transcript)}")
         self.drain_queues()
         response_parts: list[str] = []
-
-        stage_agent = asyncio.create_task(self._stage_agent_to_sentences(transcript))
-        stage_tts = asyncio.create_task(self._stage_tts_to_pcm(response_parts))
-        stage_speaker = asyncio.create_task(
-            audio.play(self._pcm_queue, self._tts_sample_rate)
-        )
-
         duration = 0.0
+
+        async def _speaker_stage() -> None:
+            nonlocal duration
+            duration = await audio.play(self._pcm_queue, self._tts_sample_rate)
+
         try:
-            duration = await stage_speaker
-            await asyncio.gather(stage_agent, stage_tts)
-        finally:
-            for task in (stage_agent, stage_tts, stage_speaker):
-                task.cancel()
-            await asyncio.gather(stage_agent, stage_tts, stage_speaker, return_exceptions=True)
+            async with asyncio.TaskGroup() as tg:
+                tg.create_task(self._stage_agent_to_sentences(transcript))
+                tg.create_task(self._stage_tts_to_pcm(response_parts))
+                tg.create_task(_speaker_stage())
+        except ExceptionGroup as eg:
+            # Re-raise first real error (not CancelledError from sibling cancellation)
+            real_errors = [e for e in eg.exceptions if not isinstance(e, asyncio.CancelledError)]
+            if real_errors:
+                raise real_errors[0] from eg
 
         logger.turn("TTS", f"played {duration:.1f}s streaming")
         return " ".join(response_parts)

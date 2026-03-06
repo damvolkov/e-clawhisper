@@ -11,10 +11,12 @@ Does NOT process audio — only manages pipeline transitions.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from enum import StrEnum, auto
 
 from e_clawhisper.daemon.adapters.agent import AgentAdapter
 from e_clawhisper.daemon.adapters.audio import AudioAdapter
+from e_clawhisper.daemon.adapters.base import AgentPort, STTPort, TTSPort
 from e_clawhisper.daemon.adapters.stt import STTAdapter
 from e_clawhisper.daemon.adapters.tts import TTSAdapter
 from e_clawhisper.daemon.sentinel.pipeline import SentinelPipeline
@@ -121,15 +123,9 @@ class Orchestrator:
     async def _run_turn(self) -> None:
         logger.set_pipeline("TURN")
 
-        if not await self._agent.is_connected():
-            try:
-                logger.system("WARN", "agent reconnecting...")
-                await self._agent.disconnect()
-                await self._agent.connect(self._agent.agent_id)
-            except Exception as exc:
-                logger.warning(f"agent reconnect failed: {exc}")
-                self._phase = PipelinePhase.SENTINEL
-                return
+        if not await self._ensure_agent():
+            self._phase = PipelinePhase.SENTINEL
+            return
 
         try:
             async with asyncio.timeout(self._config.turn_timeout):
@@ -153,31 +149,51 @@ class Orchestrator:
 
         self._phase = PipelinePhase.SENTINEL
 
+    ##### SERVICE HEALTH #####
+
+    async def _ensure_agent(self) -> bool:
+        """Verify agent connection, attempt reconnect if lost."""
+        if await self._agent.is_connected():
+            return True
+        try:
+            logger.system("WARN", "agent reconnecting...")
+            with contextlib.suppress(Exception):
+                await self._agent.disconnect()
+            await self._agent.connect(self._agent.agent_id)
+            return True
+        except Exception as exc:
+            logger.error(f"agent reconnect failed: {exc}")
+            return False
+
     ##### SHUTDOWN #####
 
     async def _shutdown(self) -> None:
-        await self._audio.stop()
-        await self._stt.disconnect()
-        await self._agent.disconnect()
+        for _name, coro in [
+            ("audio", self._audio.stop()),
+            ("stt", self._stt.disconnect()),
+            ("agent", self._agent.disconnect()),
+        ]:
+            with contextlib.suppress(Exception):
+                await coro
         logger.system("STOP", "orchestrator stopped")
 
     ##### FACTORIES #####
 
-    def _create_stt(self) -> STTAdapter:
+    def _create_stt(self) -> STTPort:
         match self._config.stt.backend:
             case STTBackend.WHISPERLIVE:
                 return STTAdapter(config=self._config.stt.whisperlive)
             case _:
                 raise ValueError(f"Unsupported STT: {self._config.stt.backend}")
 
-    def _create_tts(self) -> TTSAdapter:
+    def _create_tts(self) -> TTSPort:
         match self._config.tts.backend:
             case TTSBackend.PIPER:
                 return TTSAdapter(config=self._config.tts.piper)
             case _:
                 raise ValueError(f"Unsupported TTS: {self._config.tts.backend}")
 
-    def _create_agent(self) -> AgentAdapter:
+    def _create_agent(self) -> AgentPort:
         match self._config.agent.backend:
             case AgentBackend.OPENFANG:
                 return AgentAdapter(config=self._config.backends.openfang)

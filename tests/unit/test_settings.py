@@ -53,7 +53,6 @@ def test_app_config_defaults() -> None:
     assert cfg.vad.threshold == 0.5
     assert cfg.vad.min_recording_time == 1.0
     assert cfg.audio.sample_rate == 16000
-    assert cfg.audio.pre_roll_seconds == 2.0
 
 
 def test_app_config_sentinel_defaults() -> None:

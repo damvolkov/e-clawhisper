@@ -108,9 +108,9 @@ class AudioConfig(BaseModel):
     sample_rate: int = 16000
     channels: int = 1
     chunk_size: int = 512
-    pre_roll_seconds: float = 2.0
     queue_size: int = 100
     pcm_queue_size: int = 20
+    playback_latency: str = "high"
 
 
 class LoggingConfig(BaseModel):
@@ -122,7 +122,7 @@ class AppConfig(BaseModel):
     """Application config loaded from config.yaml."""
 
     language: str = "en"
-    turn_timeout: float = 120.0
+    turn_timeout: float = 300.0
     agent: AgentConfig = AgentConfig()
     sentinel: SentinelConfig = SentinelConfig()
     vad: VADConfig = VADConfig()

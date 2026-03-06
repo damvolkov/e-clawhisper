@@ -75,7 +75,8 @@ class STTAdapter:
     ##### RECEIVE #####
 
     async def _receive_loop(self) -> None:
-        assert self._ws is not None
+        if self._ws is None:
+            return
         try:
             async for msg in self._ws:
                 data = orjson.loads(msg)
@@ -90,7 +91,9 @@ class STTAdapter:
                 if data.get("eos"):
                     break
         except websockets.exceptions.ConnectionClosed:
-            pass
+            logger.warning("STT connection lost mid-utterance")
+        except Exception as exc:
+            logger.error(f"STT receive error: {exc}")
 
     ##### SESSION #####
 
