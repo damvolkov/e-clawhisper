@@ -12,8 +12,8 @@ import re
 import httpx
 import pytest
 
-from e_clawhisper.daemon.adapters.agent import AgentAdapter
-from e_clawhisper.daemon.adapters.tts import TTSAdapter
+from e_clawhisper.daemon.adapters.agent.openfang import OpenfangAdapter
+from e_clawhisper.daemon.adapters.tts.piper import PiperAdapter
 from e_clawhisper.shared.settings import OpenFangConfig, PiperConfig
 
 _AGENT_CONFIG = OpenFangConfig(host="127.0.0.1", port=4200, timeout=30.0)
@@ -52,11 +52,11 @@ async def test_agent_to_tts_streaming_produces_audio() -> None:
         pytest.skip("OpenFang or Piper not available")
 
     # Connect agent
-    agent = AgentAdapter(_AGENT_CONFIG)
+    agent = OpenfangAdapter(_AGENT_CONFIG)
     agent_id = await agent.resolve_agent_id(_AGENT_NAME)
     await agent.connect(agent_id)
 
-    tts = TTSAdapter(_TTS_CONFIG)
+    tts = PiperAdapter(_TTS_CONFIG)
 
     try:
         # Stream agent response with sentence splitting
@@ -87,7 +87,7 @@ async def test_agent_to_tts_streaming_produces_audio() -> None:
                     print(f"  sentence: {sentence!r} → {dur:.2f}s audio")
 
         # Flush remaining
-        if (remaining := buffer.strip()):
+        if remaining := buffer.strip():
             sentences.append(remaining)
             pcm_chunks = []
             async for pcm in tts.synthesize(remaining):
@@ -115,7 +115,7 @@ async def test_tts_streaming_yields_chunks_incrementally() -> None:
     if not await _piper_available():
         pytest.skip("Piper not available")
 
-    tts = TTSAdapter(_TTS_CONFIG)
+    tts = PiperAdapter(_TTS_CONFIG)
     text = "Esta es una frase bastante larga que debería producir múltiples fragmentos de audio para verificar el streaming."
 
     chunk_count = 0
@@ -133,7 +133,7 @@ async def test_sentence_split_tts_sequential_consistency() -> None:
     if not await _piper_available():
         pytest.skip("Piper not available")
 
-    tts = TTSAdapter(_TTS_CONFIG)
+    tts = PiperAdapter(_TTS_CONFIG)
     full_text = "Hola mundo. Esto es una prueba. Funciona correctamente."
 
     # Full text at once

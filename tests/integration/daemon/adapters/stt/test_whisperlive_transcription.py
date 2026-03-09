@@ -12,8 +12,8 @@ import asyncio
 import numpy as np
 import pytest
 
-from e_clawhisper.daemon.adapters.stt import STTAdapter
-from e_clawhisper.daemon.adapters.tts import TTSAdapter
+from e_clawhisper.daemon.adapters.stt.whisperlive import WhisperliveAdapter
+from e_clawhisper.daemon.adapters.tts.piper import PiperAdapter
 from e_clawhisper.shared.settings import PiperConfig, WhisperLiveConfig
 
 _STT_CONFIG = WhisperLiveConfig(host="localhost", port=9090, model="small", language="es")
@@ -47,7 +47,7 @@ async def _tts_available() -> bool:
 
 async def _generate_speech(text: str) -> np.ndarray:
     """Generate int16 PCM at 16kHz from Piper TTS (22050Hz) via resampling."""
-    tts = TTSAdapter(_TTS_CONFIG)
+    tts = PiperAdapter(_TTS_CONFIG)
     chunks = [chunk async for chunk in tts.synthesize(text)]
     pcm = b"".join(chunks)
     audio_22k = np.frombuffer(pcm, dtype=np.int16).astype(np.float64)
@@ -61,7 +61,7 @@ async def _generate_speech(text: str) -> np.ndarray:
 
 async def _transcribe(audio_16k: np.ndarray, speed: float = 1.5) -> str:
     """Send int16 audio at 16kHz to WhisperLive at ~speed× real-time."""
-    stt = STTAdapter(_STT_CONFIG)
+    stt = WhisperliveAdapter(_STT_CONFIG)
     await stt.connect()
 
     try:
@@ -73,7 +73,7 @@ async def _transcribe(audio_16k: np.ndarray, speed: float = 1.5) -> str:
 
         for i in range(0, len(audio_16k), chunk_size):
             chunk = audio_16k[i : i + chunk_size]
-            await stt.stream(STTAdapter.audio_to_float32(chunk))
+            await stt.stream(WhisperliveAdapter.audio_to_float32(chunk))
             await asyncio.sleep(sleep_per_chunk)
 
         await asyncio.sleep(1.0)

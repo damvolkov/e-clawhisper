@@ -17,7 +17,7 @@ from e_clawhisper.shared.settings import OpenFangConfig
 _RESPONSE_TYPES = frozenset({"text_delta", "response", "typing", "tool_start", "tool_result", "phase"})
 
 
-class AgentAdapter:
+class OpenfangAdapter:
     """Persistent WebSocket to OpenFang agent with background message dispatch."""
 
     __slots__ = ("_host", "_port", "_timeout", "_base_url", "_ws", "_agent_id", "_response_queue", "_recv_task")

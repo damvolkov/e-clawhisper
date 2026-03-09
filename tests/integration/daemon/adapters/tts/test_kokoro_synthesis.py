@@ -1,37 +1,35 @@
-"""Integration test — Piper TTS via Wyoming protocol.
+"""Integration test — Kokoro TTS via OpenAI-compatible /v1/audio/speech.
 
-Requires Piper running at localhost:10200.
-Run with: uv run pytest tests/integration/daemon/adapters/tts/ -v -s
+Requires Kokoro FastAPI running at localhost:45130.
+Run with: uv run pytest tests/integration/daemon/adapters/tts/test_kokoro_synthesis.py -v -s
 """
 
 from __future__ import annotations
 
-import asyncio
-
+import httpx
 import numpy as np
 import pytest
 
-from e_clawhisper.daemon.adapters.tts.piper import PiperAdapter
-from e_clawhisper.shared.settings import PiperConfig
+from e_clawhisper.daemon.adapters.tts.kokoro import KokoroAdapter
+from e_clawhisper.shared.settings import KokoroConfig
 
-_CONFIG = PiperConfig(host="localhost", port=10200, sample_rate=22050)
-_SAMPLE_RATE = 22050
+_CONFIG = KokoroConfig(host="localhost", port=45130, voice="em_alex", sample_rate=24000)
+_SAMPLE_RATE = 24000
 
 
 ##### HELPERS #####
 
 
-async def _piper_available() -> bool:
+async def _kokoro_available() -> bool:
     try:
-        _, writer = await asyncio.wait_for(asyncio.open_connection("localhost", 10200), timeout=2.0)
-        writer.close()
-        await writer.wait_closed()
-    except (OSError, TimeoutError):
+        async with httpx.AsyncClient(base_url="http://localhost:45130", timeout=3.0) as client:
+            resp = await client.get("/health")
+            return resp.status_code == 200
+    except (httpx.ConnectError, httpx.TimeoutException):
         return False
-    return True
 
 
-async def _synthesize_full(adapter: PiperAdapter, text: str) -> tuple[bytes, np.ndarray, float]:
+async def _synthesize_full(adapter: KokoroAdapter, text: str) -> tuple[bytes, np.ndarray, float]:
     """Synthesize text, return (raw_pcm, int16_array, duration_seconds)."""
     chunks = [chunk async for chunk in adapter.synthesize(text)]
     pcm = b"".join(chunks)
@@ -44,10 +42,10 @@ async def _synthesize_full(adapter: PiperAdapter, text: str) -> tuple[bytes, np.
 
 
 async def test_synthesize_returns_audio() -> None:
-    if not await _piper_available():
-        pytest.skip("Piper not available at localhost:10200")
+    if not await _kokoro_available():
+        pytest.skip("Kokoro not available at localhost:45130")
 
-    adapter = PiperAdapter(_CONFIG)
+    adapter = KokoroAdapter(_CONFIG)
     pcm, audio, duration = await _synthesize_full(adapter, "Hola, esto es una prueba")
 
     assert len(pcm) > 0, "No PCM data returned"
@@ -57,10 +55,10 @@ async def test_synthesize_returns_audio() -> None:
 
 
 async def test_synthesize_longer_text_produces_more_audio() -> None:
-    if not await _piper_available():
-        pytest.skip("Piper not available at localhost:10200")
+    if not await _kokoro_available():
+        pytest.skip("Kokoro not available at localhost:45130")
 
-    adapter = PiperAdapter(_CONFIG)
+    adapter = KokoroAdapter(_CONFIG)
     _, _, short_dur = await _synthesize_full(adapter, "Hola")
     _, _, long_dur = await _synthesize_full(
         adapter, "Esta es una frase mucho más larga para comprobar que produce más audio"
@@ -74,10 +72,10 @@ async def test_synthesize_longer_text_produces_more_audio() -> None:
 
 
 async def test_audio_is_not_silence() -> None:
-    if not await _piper_available():
-        pytest.skip("Piper not available at localhost:10200")
+    if not await _kokoro_available():
+        pytest.skip("Kokoro not available at localhost:45130")
 
-    adapter = PiperAdapter(_CONFIG)
+    adapter = KokoroAdapter(_CONFIG)
     _, audio, _ = await _synthesize_full(adapter, "Probando uno dos tres")
 
     rms = np.sqrt(np.mean(audio.astype(np.float64) ** 2))
@@ -89,10 +87,10 @@ async def test_audio_is_not_silence() -> None:
 
 
 async def test_stop_interrupts_synthesis() -> None:
-    if not await _piper_available():
-        pytest.skip("Piper not available at localhost:10200")
+    if not await _kokoro_available():
+        pytest.skip("Kokoro not available at localhost:45130")
 
-    adapter = PiperAdapter(_CONFIG)
+    adapter = KokoroAdapter(_CONFIG)
     chunks: list[bytes] = []
 
     async for chunk in adapter.synthesize("Esta es una frase extremadamente larga que debería tardar bastante"):
@@ -116,10 +114,10 @@ async def test_stop_interrupts_synthesis() -> None:
 
 
 async def test_multiple_sequential_synthesize() -> None:
-    if not await _piper_available():
-        pytest.skip("Piper not available at localhost:10200")
+    if not await _kokoro_available():
+        pytest.skip("Kokoro not available at localhost:45130")
 
-    adapter = PiperAdapter(_CONFIG)
+    adapter = KokoroAdapter(_CONFIG)
     texts = ["Primera frase", "Segunda frase", "Tercera frase"]
 
     for text in texts:

@@ -41,29 +41,32 @@ down: ## Stop infrastructure
 	docker compose -f compose.infra.yml down
 
 _ensure-stt:
-	@nc -z localhost $${STT_PORT:-9090} 2>/dev/null \
+	@nc -z localhost $${STT_PORT:-45120} 2>/dev/null \
 		&& echo '✓ STT already up' \
 		|| { echo '⏳ Starting STT...'; \
 		     docker compose -f compose.infra.yml up -d stt; \
 		     for i in $$(seq 1 90); do \
-		       nc -z localhost $${STT_PORT:-9090} 2>/dev/null && echo '✓ STT ready' && exit 0; \
+		       nc -z localhost $${STT_PORT:-45120} 2>/dev/null && echo '✓ STT ready' && exit 0; \
 		       sleep 1; \
 		     done; \
 		     echo '✗ STT timeout'; exit 1; }
 
 _ensure-tts:
-	@nc -z localhost $${TTS_PORT:-10200} 2>/dev/null \
+	@nc -z localhost $${TTS_PORT:-45130} 2>/dev/null \
 		&& echo '✓ TTS already up' \
 		|| { echo '⏳ Starting TTS...'; \
 		     docker compose -f compose.infra.yml up -d tts; \
 		     for i in $$(seq 1 60); do \
-		       nc -z localhost $${TTS_PORT:-10200} 2>/dev/null && echo '✓ TTS ready' && exit 0; \
+		       nc -z localhost $${TTS_PORT:-45130} 2>/dev/null && echo '✓ TTS ready' && exit 0; \
 		       sleep 1; \
 		     done; \
 		     echo '✗ TTS timeout'; exit 1; }
 
-script: ## Run a test script (e.g. make script vad_streaming)
-	@uv run python tests/scripts/$(filter-out $@,$(MAKECMDGOALS)).py
+script: ## Run a test script (e.g. make script sentinel [args])
+	$(eval _ARGS := $(filter-out $@ script,$(MAKECMDGOALS)))
+	$(eval _NAME := $(word 1,$(_ARGS)))
+	$(eval _REST := $(wordlist 2,$(words $(_ARGS)),$(_ARGS)))
+	@uv run python tests/scripts/$(_NAME).py $(_REST)
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'

@@ -6,9 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from e_clawhisper.daemon.adapters.agent import AgentAdapter
-from e_clawhisper.daemon.adapters.stt import STTAdapter
-from e_clawhisper.daemon.adapters.tts import TTSAdapter
+from e_clawhisper.daemon.adapters.base import AgentPort, STTPort, TTSPort
 from e_clawhisper.daemon.turn.pipeline import _SENTENCE_RE, TurnPipeline
 from e_clawhisper.shared.settings import VADConfig
 
@@ -44,9 +42,9 @@ def test_sentence_regex_splits(text: str, expected: list[str]) -> None:
 ##### HELPERS #####
 
 
-def _make_pipeline(agent: AgentAdapter) -> TurnPipeline:
-    stt = AsyncMock(spec=STTAdapter)
-    tts = AsyncMock(spec=TTSAdapter)
+def _make_pipeline(agent: AgentPort) -> TurnPipeline:
+    stt = AsyncMock(spec=STTPort)
+    tts = AsyncMock(spec=TTSPort)
     vad_cfg = VADConfig(threshold=0.5, silence_duration=1.5, min_recording_time=1.0)
     return TurnPipeline(stt=stt, agent=agent, tts=tts, vad_config=vad_cfg)
 
@@ -68,7 +66,7 @@ async def _collect_sentences(pipeline: TurnPipeline, transcript: str) -> list[st
 
 async def test_producer_yields_sentences_from_chunks() -> None:
     """Simulate agent streaming text_delta → sentence queue."""
-    agent = AsyncMock(spec=AgentAdapter)
+    agent = AsyncMock(spec=AgentPort)
 
     async def _fake_send(text: str):
         for chunk in ["Hello ", "world. ", "How are ", "you? ", "Fine."]:
@@ -83,7 +81,7 @@ async def test_producer_yields_sentences_from_chunks() -> None:
 
 async def test_producer_flushes_remaining_buffer() -> None:
     """Text without trailing punctuation is flushed as final sentence."""
-    agent = AsyncMock(spec=AgentAdapter)
+    agent = AsyncMock(spec=AgentPort)
 
     async def _fake_send(text: str):
         for chunk in ["No punctuation ", "at the end"]:
@@ -98,7 +96,7 @@ async def test_producer_flushes_remaining_buffer() -> None:
 
 async def test_producer_handles_newline_splits() -> None:
     """Newlines also trigger sentence boundaries."""
-    agent = AsyncMock(spec=AgentAdapter)
+    agent = AsyncMock(spec=AgentPort)
 
     async def _fake_send(text: str):
         for chunk in ["Line one\n", "Line two\n", "Line three"]:
@@ -113,7 +111,7 @@ async def test_producer_handles_newline_splits() -> None:
 
 async def test_producer_empty_response() -> None:
     """Empty agent response produces no sentences (only poison pill)."""
-    agent = AsyncMock(spec=AgentAdapter)
+    agent = AsyncMock(spec=AgentPort)
 
     async def _fake_send(text: str):
         return

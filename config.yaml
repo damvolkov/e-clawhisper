@@ -2,7 +2,7 @@ language: es
 
 agent:
   name: damien
-  backend: openfang
+  backend: generic
 
 sentinel:
   energy_floor: 0.01
@@ -21,20 +21,26 @@ backends:
     host: 127.0.0.1
     port: 4200
     timeout: 30.0
+  generic:
+    host: localhost
+    port: 45100
+    api_key: ""
+    timeout: 60.0
 
 stt:
   backend: whisperlive
   whisperlive:
     host: localhost
-    port: 9090
-    model: small
+    port: 45120
+    model: large-v3-turbo
 
 tts:
-  backend: piper
-  piper:
+  backend: kokoro
+  kokoro:
     host: localhost
-    port: 10200
-    sample_rate: 22050
+    port: 45130
+    voice: em_alex
+    sample_rate: 24000
 
 audio:
   sample_rate: 16000
@@ -42,5 +48,5 @@ audio:
   chunk_size: 512
 
 logging:
-  idle_interval: 0.5
-  turn_interval: 0.5
+  idle_interval: 0.25
+  turn_interval: 0.25

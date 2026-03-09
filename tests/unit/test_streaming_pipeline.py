@@ -7,10 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from e_clawhisper.daemon.adapters.agent import AgentAdapter
 from e_clawhisper.daemon.adapters.audio import AudioAdapter
-from e_clawhisper.daemon.adapters.stt import STTAdapter
-from e_clawhisper.daemon.adapters.tts import TTSAdapter
+from e_clawhisper.daemon.adapters.base import AgentPort, STTPort, TTSPort
 from e_clawhisper.daemon.turn.pipeline import TurnPipeline
 from e_clawhisper.shared.settings import VADConfig
 
@@ -22,8 +20,8 @@ _DEADLOCK_TIMEOUT = 3.0
 ##### HELPERS #####
 
 
-def _make_agent(chunks: list[str]) -> AgentAdapter:
-    agent = AsyncMock(spec=AgentAdapter)
+def _make_agent(chunks: list[str]) -> AgentPort:
+    agent = AsyncMock(spec=AgentPort)
 
     async def _fake_send(text: str):
         for c in chunks:
@@ -33,8 +31,8 @@ def _make_agent(chunks: list[str]) -> AgentAdapter:
     return agent
 
 
-def _make_tts(pcm_per_sentence: int = 2) -> TTSAdapter:
-    tts = AsyncMock(spec=TTSAdapter)
+def _make_tts(pcm_per_sentence: int = 2) -> TTSPort:
+    tts = AsyncMock(spec=TTSPort)
 
     async def _fake_synthesize(text: str):
         for _ in range(pcm_per_sentence):
@@ -44,8 +42,8 @@ def _make_tts(pcm_per_sentence: int = 2) -> TTSAdapter:
     return tts
 
 
-def _make_pipeline(agent: AgentAdapter, tts: TTSAdapter) -> TurnPipeline:
-    stt = AsyncMock(spec=STTAdapter)
+def _make_pipeline(agent: AgentPort, tts: TTSPort) -> TurnPipeline:
+    stt = AsyncMock(spec=STTPort)
     return TurnPipeline(stt=stt, agent=agent, tts=tts, vad_config=_VAD_CFG, tts_sample_rate=16000)
 
 
@@ -166,7 +164,7 @@ async def test_stream_response_concurrent_execution() -> None:
     """Verify all 3 stages run as concurrent tasks (not sequential)."""
     execution_order: list[str] = []
 
-    agent = AsyncMock(spec=AgentAdapter)
+    agent = AsyncMock(spec=AgentPort)
 
     async def _slow_agent(text: str):
         execution_order.append("agent_start")
@@ -177,7 +175,7 @@ async def test_stream_response_concurrent_execution() -> None:
 
     agent.send = _slow_agent
 
-    tts = AsyncMock(spec=TTSAdapter)
+    tts = AsyncMock(spec=TTSPort)
 
     async def _slow_tts(text: str):
         execution_order.append(f"tts_{text[:5]}")
@@ -203,7 +201,7 @@ async def test_stream_response_concurrent_execution() -> None:
 
 async def test_agent_failure_does_not_deadlock() -> None:
     """Agent error mid-stream must cancel TTS+speaker — no infinite wait."""
-    agent = AsyncMock(spec=AgentAdapter)
+    agent = AsyncMock(spec=AgentPort)
 
     async def _failing_agent(text: str):
         yield "Hello. "
@@ -225,7 +223,7 @@ async def test_tts_failure_does_not_deadlock() -> None:
     """TTS error during synthesis must cancel agent+speaker — no infinite wait."""
     agent = _make_agent(["First sentence. ", "Second sentence. ", "Third."])
 
-    tts = AsyncMock(spec=TTSAdapter)
+    tts = AsyncMock(spec=TTSPort)
     call_count = 0
 
     async def _failing_tts(text: str):
@@ -268,7 +266,7 @@ async def test_speaker_failure_does_not_deadlock() -> None:
 
 async def test_agent_failure_propagates_through_run() -> None:
     """Agent crash during run() returns TurnError (caught by run's handler), not hang."""
-    agent = AsyncMock(spec=AgentAdapter)
+    agent = AsyncMock(spec=AgentPort)
 
     async def _crashing_agent(text: str):
         yield "partial "
@@ -277,7 +275,7 @@ async def test_agent_failure_propagates_through_run() -> None:
     agent.send = _crashing_agent
 
     tts = _make_tts(pcm_per_sentence=1)
-    stt = AsyncMock(spec=STTAdapter)
+    stt = AsyncMock(spec=STTPort)
     stt.finish_utterance = AsyncMock(return_value="user said something")
     stt.start_utterance = AsyncMock()
     stt.stream = AsyncMock()
@@ -305,7 +303,7 @@ async def test_all_stages_cancelled_on_first_failure() -> None:
     """Verify TaskGroup cancels sibling tasks when one fails."""
     cancelled_stages: list[str] = []
 
-    agent = AsyncMock(spec=AgentAdapter)
+    agent = AsyncMock(spec=AgentPort)
 
     async def _slow_agent(text: str):
         try:
@@ -318,7 +316,7 @@ async def test_all_stages_cancelled_on_first_failure() -> None:
 
     agent.send = _slow_agent
 
-    tts = AsyncMock(spec=TTSAdapter)
+    tts = AsyncMock(spec=TTSPort)
 
     async def _ok_tts(text: str):
         yield _PCM_CHUNK

@@ -14,11 +14,13 @@ import asyncio
 import contextlib
 from enum import StrEnum, auto
 
-from e_clawhisper.daemon.adapters.agent import AgentAdapter
+from e_clawhisper.daemon.adapters.agent.generic import GenericAdapter
+from e_clawhisper.daemon.adapters.agent.openfang import OpenfangAdapter
 from e_clawhisper.daemon.adapters.audio import AudioAdapter
 from e_clawhisper.daemon.adapters.base import AgentPort, STTPort, TTSPort
-from e_clawhisper.daemon.adapters.stt import STTAdapter
-from e_clawhisper.daemon.adapters.tts import TTSAdapter
+from e_clawhisper.daemon.adapters.stt.whisperlive import WhisperliveAdapter
+from e_clawhisper.daemon.adapters.tts.kokoro import KokoroAdapter
+from e_clawhisper.daemon.adapters.tts.piper import PiperAdapter
 from e_clawhisper.daemon.sentinel.pipeline import SentinelPipeline
 from e_clawhisper.daemon.turn.pipeline import TurnPipeline
 from e_clawhisper.shared.logger import logger
@@ -62,7 +64,7 @@ class Orchestrator:
             agent=self._agent,
             tts=self._tts,
             vad_config=config.vad,
-            tts_sample_rate=config.tts.piper.sample_rate,
+            tts_sample_rate=config.tts_sample_rate,
             pcm_queue_size=config.audio.pcm_queue_size,
         )
 
@@ -182,20 +184,24 @@ class Orchestrator:
     def _create_stt(self) -> STTPort:
         match self._config.stt.backend:
             case STTBackend.WHISPERLIVE:
-                return STTAdapter(config=self._config.stt.whisperlive)
+                return WhisperliveAdapter(config=self._config.stt.whisperlive)
             case _:
                 raise ValueError(f"Unsupported STT: {self._config.stt.backend}")
 
     def _create_tts(self) -> TTSPort:
         match self._config.tts.backend:
             case TTSBackend.PIPER:
-                return TTSAdapter(config=self._config.tts.piper)
+                return PiperAdapter(config=self._config.tts.piper)
+            case TTSBackend.KOKORO:
+                return KokoroAdapter(config=self._config.tts.kokoro)
             case _:
                 raise ValueError(f"Unsupported TTS: {self._config.tts.backend}")
 
     def _create_agent(self) -> AgentPort:
         match self._config.agent.backend:
             case AgentBackend.OPENFANG:
-                return AgentAdapter(config=self._config.backends.openfang)
+                return OpenfangAdapter(config=self._config.backends.openfang)
+            case AgentBackend.GENERIC:
+                return GenericAdapter(config=self._config.backends.generic)
             case _:
                 raise ValueError(f"Unsupported agent: {self._config.agent.backend}")

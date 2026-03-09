@@ -89,9 +89,7 @@ class TurnPipeline:
                 audio_chunk = await audio.queue.get()
 
                 stt_task = asyncio.create_task(self._stt.stream(audio_chunk.tobytes()))
-                vad_result = await loop.run_in_executor(
-                    self._executor, self._vad.process, audio_chunk
-                )
+                vad_result = await loop.run_in_executor(self._executor, self._vad.process, audio_chunk)
                 await stt_task
 
                 if vad_result.is_speech:
@@ -178,7 +176,7 @@ class TurnPipeline:
                         logger.turn_debug("STREAM", f"sentence: {logger.truncate(sentence, 50)}")
                         await self._sentence_queue.put(sentence)
 
-            if (remaining := buffer.strip()):
+            if remaining := buffer.strip():
                 await self._sentence_queue.put(remaining)
         finally:
             await self._sentence_queue.put(_SENTINEL)

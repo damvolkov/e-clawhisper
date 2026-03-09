@@ -2,15 +2,9 @@ services:
 
   stt:
     image: ghcr.io/collabora/whisperlive-gpu:latest
-    container_name: clawhisper-stt
-    hostname: stt
+    container_name: stt
     restart: unless-stopped
-    ports:
-      - "${STT_PORT:-9090}:9090"
-    volumes:
-      - ./data/stt:/root/.cache/huggingface
-    environment:
-      - WHISPER_MODEL=${WHISPER_MODEL:-small}
+    runtime: nvidia
     deploy:
       resources:
         reservations:
@@ -18,6 +12,13 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+    ports:
+      - "${STT_PORT:-45120}:9090"
+    volumes:
+      - ./data/stt:/root/.cache/huggingface
+    environment:
+      - WHISPER_MODEL=${WHISPER_MODEL:-large-v3-turbo}
+      - PROVIDER=cuda
     healthcheck:
       test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('localhost', 9090)); s.close()"]
       interval: 30s
@@ -25,31 +26,38 @@ services:
       retries: 5
       start_period: 60s
     networks:
-      - clawhisper
+      - e-core
 
   tts:
-    image: lscr.io/linuxserver/piper:latest
-    container_name: clawhisper-tts
-    hostname: tts
+    image: ghcr.io/remsky/kokoro-fastapi-gpu:latest
+    container_name: tts
     restart: unless-stopped
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     ports:
-      - "${TTS_PORT:-10200}:10200"
+      - "${TTS_PORT:-45130}:8880"
     volumes:
-      - ./data/tts:/config
+      - ./data/tts:/app/voices
+      - ./config/tts:/app/config
     environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
-      - TZ=${TZ:-Etc/UTC}
-      - PIPER_VOICE=${PIPER_VOICE:-es_ES-sharvard-medium}
+      - OUTPUT_FORMAT=pcm
+      - DEFAULT_VOICE=em_alex
+      - USE_GPU=true
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "10200"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8880/health"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     networks:
-      - clawhisper
+      - e-core
 
 networks:
-  clawhisper:
-    driver: bridge
+  e-core:
+    external: true

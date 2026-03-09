@@ -50,9 +50,7 @@ class PipelineRenderer:
 
     __slots__ = ()
 
-    def __call__(
-        self, logger_instance: Any, method_name: str, event_dict: dict[str, Any]
-    ) -> str:
+    def __call__(self, logger_instance: Any, method_name: str, event_dict: dict[str, Any]) -> str:
         pipeline = str(event_dict.pop("pipeline", "SYSTEM")).upper()
         step = str(event_dict.pop("step", "")).upper()
         event = event_dict.pop("event", "")
@@ -62,9 +60,7 @@ class PipelineRenderer:
 
         # Build key=value extras
         skip = {"timestamp", "level", "logger"}
-        extras = " ".join(
-            f"{k}={v}" for k, v in event_dict.items() if k not in skip and v is not None
-        )
+        extras = " ".join(f"{k}={v}" for k, v in event_dict.items() if k not in skip and v is not None)
 
         parts = [f"{ts} [{pipeline}]"]
         if step:
@@ -99,13 +95,14 @@ class PipelineRenderer:
 class PipelineLogger:
     """Pipeline-aware logger with throttle support."""
 
-    __slots__ = ("_log", "_idle_interval", "_turn_interval", "_last_debug", "_pipeline")
+    __slots__ = ("_log", "_idle_interval", "_turn_interval", "_last_debug", "_last_step", "_pipeline")
 
     def __init__(self, name: str) -> None:
         self._log = structlog.get_logger(name)
-        self._idle_interval: float = 0.5
-        self._turn_interval: float = 0.5
+        self._idle_interval: float = 0.25
+        self._turn_interval: float = 0.25
         self._last_debug: float = 0.0
+        self._last_step: str = ""
         self._pipeline: str = "SYSTEM"
 
     def configure_throttle(self, *, idle_interval: float, turn_interval: float) -> None:
@@ -126,9 +123,10 @@ class PipelineLogger:
 
     def sentinel_debug(self, step: str, msg: str = "", **kw: Any) -> None:
         now = time.monotonic()
-        if now - self._last_debug < self._idle_interval:
+        if step == self._last_step and now - self._last_debug < self._idle_interval:
             return
         self._last_debug = now
+        self._last_step = step
         self._log.debug(msg, pipeline="SENTINEL", step=step, **kw)
 
     ##### TURN #####
@@ -161,8 +159,8 @@ class PipelineLogger:
 def configure_logging(
     level: str = "info",
     *,
-    idle_interval: float = 0.5,
-    turn_interval: float = 0.5,
+    idle_interval: float = 0.25,
+    turn_interval: float = 0.25,
 ) -> None:
     structlog.configure(
         processors=[

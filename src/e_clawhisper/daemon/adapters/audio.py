@@ -95,7 +95,10 @@ class AudioAdapter:
         silence = bytes(sample_rate * 2)  # 1s pre-allocated int16 silence
 
         def _fill_output(
-            outdata: memoryview, frames: int, _time: object, _status: sd.CallbackFlags,
+            outdata: memoryview,
+            frames: int,
+            _time: object,
+            _status: sd.CallbackFlags,
         ) -> None:
             needed = frames * 2  # int16 mono = 2 bytes/frame
             pos = 0
@@ -113,8 +116,11 @@ class AudioAdapter:
                 outdata[pos:needed] = silence[: needed - pos]
 
         out = sd.RawOutputStream(
-            samplerate=sample_rate, channels=1, dtype="int16",
-            latency=self._playback_latency, callback=_fill_output,
+            samplerate=sample_rate,
+            channels=1,
+            dtype="int16",
+            latency=self._playback_latency,
+            callback=_fill_output,
         )
         out.start()
         try:

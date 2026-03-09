@@ -15,6 +15,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class AgentBackend(StrEnum):
     OPENFANG = auto()
+    GENERIC = auto()
 
 
 class STTBackend(StrEnum):
@@ -23,6 +24,7 @@ class STTBackend(StrEnum):
 
 class TTSBackend(StrEnum):
     PIPER = auto()
+    KOKORO = auto()
 
 
 ##### CONSTANTS #####
@@ -69,14 +71,26 @@ class OpenFangConfig(BaseModel):
     timeout: float = 30.0
 
 
+class GenericLLMConfig(BaseModel):
+    """OpenAI-compatible LLM endpoint (vLLM, Ollama, etc.)."""
+
+    host: str = "localhost"
+    port: int = 45100
+    model: str = "default"
+    api_key: str = ""
+    timeout: float = 60.0
+    system_prompt: str = "You are a helpful voice assistant. Keep responses concise and conversational."
+
+
 class BackendsConfig(BaseModel):
     openfang: OpenFangConfig = OpenFangConfig()
+    generic: GenericLLMConfig = GenericLLMConfig()
 
 
 class WhisperLiveConfig(BaseModel):
     host: str = "localhost"
-    port: int = 9090
-    model: str = "small"
+    port: int = 45120
+    model: str = "large-v3"
     language: str = "en"
     finish_timeout: float = 5.0
 
@@ -88,15 +102,28 @@ class STTConfig(BaseModel):
 
 class PiperConfig(BaseModel):
     host: str = "localhost"
-    port: int = 10200
-    voice: str = "en_US-lessac-medium"
+    port: int = 45130
+    voice: str = "es_ES-davefx-medium"
     sample_rate: int = 22050
     disconnect_timeout: float = 0.5
 
 
+class KokoroConfig(BaseModel):
+    """Kokoro FastAPI — OpenAI-compatible TTS (/v1/audio/speech)."""
+
+    host: str = "localhost"
+    port: int = 45130
+    model: str = "kokoro"
+    voice: str = "em_alex"
+    sample_rate: int = 24000
+    response_format: str = "pcm"
+    timeout: float = 30.0
+
+
 class TTSConfig(BaseModel):
-    backend: TTSBackend = TTSBackend.PIPER
+    backend: TTSBackend = TTSBackend.KOKORO
     piper: PiperConfig = PiperConfig()
+    kokoro: KokoroConfig = KokoroConfig()
 
 
 class AgentConfig(BaseModel):
@@ -114,8 +141,8 @@ class AudioConfig(BaseModel):
 
 
 class LoggingConfig(BaseModel):
-    idle_interval: float = 0.5
-    turn_interval: float = 0.5
+    idle_interval: float = 0.25
+    turn_interval: float = 0.25
 
 
 class AppConfig(BaseModel):
@@ -131,6 +158,15 @@ class AppConfig(BaseModel):
     tts: TTSConfig = TTSConfig()
     audio: AudioConfig = AudioConfig()
     logging: LoggingConfig = LoggingConfig()
+
+    @property
+    def tts_sample_rate(self) -> int:
+        """Active TTS backend sample rate."""
+        match self.tts.backend:
+            case TTSBackend.KOKORO:
+                return self.tts.kokoro.sample_rate
+            case _:
+                return self.tts.piper.sample_rate
 
     @model_validator(mode="after")
     def cascade_language(self) -> AppConfig:

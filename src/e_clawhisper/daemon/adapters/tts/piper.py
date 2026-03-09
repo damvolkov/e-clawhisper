@@ -13,7 +13,7 @@ from wyoming.tts import Synthesize
 from e_clawhisper.shared.settings import PiperConfig
 
 
-class TTSAdapter:
+class PiperAdapter:
     """TTS via Piper Wyoming protocol."""
 
     __slots__ = ("_host", "_port", "_sample_rate", "_disconnect_timeout", "_stopped")

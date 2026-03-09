@@ -80,6 +80,7 @@ class SentinelPipeline:
 
             if energy < self._energy_floor:
                 await ww_future  # drain to keep OWW state advancing
+                logger.sentinel_debug("SILENCE", e=f"{energy:.4f}")
                 continue
 
             # Parallel: Silero VAD + OWW (already submitted)

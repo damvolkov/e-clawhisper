@@ -15,7 +15,7 @@ from e_clawhisper.shared.logger import logger
 from e_clawhisper.shared.settings import WhisperLiveConfig
 
 
-class STTAdapter:
+class WhisperliveAdapter:
     """Streaming STT via WhisperLive WebSocket."""
 
     __slots__ = (
@@ -81,11 +81,7 @@ class STTAdapter:
             async for msg in self._ws:
                 data = orjson.loads(msg)
                 if "segments" in data:
-                    text = " ".join(
-                        seg_text
-                        for seg in data["segments"]
-                        if (seg_text := seg.get("text", "").strip())
-                    )
+                    text = " ".join(seg_text for seg in data["segments"] if (seg_text := seg.get("text", "").strip()))
                     if text:
                         self._final_text = text
                 if data.get("eos"):
