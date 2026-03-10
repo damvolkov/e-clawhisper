@@ -18,9 +18,10 @@ test: ## Run tests
 
 check: lint type test ## Full check: lint + type + test
 
-run: ## Ensure infra (STT+TTS) is up, then start a session
+run: ## Start session (e.g. make run / make run generic)
+	$(eval _AGENT := $(word 2,$(MAKECMDGOALS)))
 	@$(MAKE) -j2 _ensure-stt _ensure-tts
-	@ENVIRONMENT=DEV LOG_LEVEL=debug uv run python -m e_clawhisper.main session start
+	@ENVIRONMENT=DEV LOG_LEVEL=debug AGENT_BACKEND=$(_AGENT) uv run python -m e_clawhisper.main session start
 
 start: ## Start the voice daemon (foreground)
 	uv run eclaw start

@@ -10,6 +10,7 @@ import pytest
 from e_clawhisper.shared.settings import (
     AgentBackend,
     AppConfig,
+    LLMProvider,
     Settings,
     STTBackend,
     TTSBackend,
@@ -98,8 +99,8 @@ sentinel:
 
 def test_app_config_generic_backend_defaults() -> None:
     cfg = AppConfig()
-    assert cfg.backends.generic.host == "localhost"
-    assert cfg.backends.generic.port == 45100
+    assert cfg.backends.generic.provider == LLMProvider.GEMINI
+    assert cfg.backends.generic.model == "gemini-2.0-flash"
     assert cfg.backends.generic.timeout == 60.0
 
 
@@ -129,9 +130,10 @@ agent:
   backend: generic
 backends:
   generic:
+    provider: vllm
+    model: qwen2
     host: 10.0.0.1
     port: 8080
-    model: qwen2
 tts:
   backend: kokoro
   kokoro:
@@ -143,6 +145,7 @@ tts:
         cfg = AppConfig.from_yaml(Path(f.name))
 
     assert cfg.agent.backend == AgentBackend.GENERIC
+    assert cfg.backends.generic.provider == LLMProvider.VLLM
     assert cfg.backends.generic.host == "10.0.0.1"
     assert cfg.backends.generic.port == 8080
     assert cfg.backends.generic.model == "qwen2"

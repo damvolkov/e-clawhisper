@@ -2,7 +2,7 @@ language: es
 
 agent:
   name: damien
-  backend: generic
+  backend: openfang  # openfang | generic
 
 sentinel:
   energy_floor: 0.01
@@ -22,10 +22,12 @@ backends:
     port: 4200
     timeout: 30.0
   generic:
+    provider: gemini  # gemini | openai | anthropic | vllm
+    model: gemini-2.0-flash
+    timeout: 60.0
+    # vllm only
     host: localhost
     port: 45100
-    api_key: ""
-    timeout: 60.0
 
 stt:
   backend: whisperlive

@@ -18,6 +18,13 @@ class AgentBackend(StrEnum):
     GENERIC = auto()
 
 
+class LLMProvider(StrEnum):
+    GEMINI = auto()
+    OPENAI = auto()
+    ANTHROPIC = auto()
+    VLLM = auto()
+
+
 class STTBackend(StrEnum):
     WHISPERLIVE = auto()
 
@@ -42,15 +49,11 @@ _DEFAULT_VOICES: dict[str, str] = {
 
 
 class WakewordConfig(BaseModel):
-    """Wake word detection (OpenWakeWord ONNX)."""
-
     model: str = "alexa"
     threshold: float = 0.5
 
 
 class SentinelConfig(BaseModel):
-    """Sentinel pipeline — passive listening."""
-
     energy_floor: float = 0.01
     vad_threshold: float = 0.5
     cooldown: float = 1.5
@@ -58,8 +61,6 @@ class SentinelConfig(BaseModel):
 
 
 class VADConfig(BaseModel):
-    """Turn-pipeline VAD — end-of-speech detection (Silero ONNX)."""
-
     threshold: float = 0.5
     silence_duration: float = 1.5
     min_recording_time: float = 1.0
@@ -72,14 +73,16 @@ class OpenFangConfig(BaseModel):
 
 
 class GenericLLMConfig(BaseModel):
-    """OpenAI-compatible LLM endpoint (vLLM, Ollama, etc.)."""
+    """Multi-provider LLM config (PydanticAI)."""
 
-    host: str = "localhost"
-    port: int = 45100
-    model: str = "default"
+    provider: LLMProvider = LLMProvider.GEMINI
+    model: str = "gemini-2.0-flash"
     api_key: str = ""
     timeout: float = 60.0
     system_prompt: str = "You are a helpful voice assistant. Keep responses concise and conversational."
+    # vLLM only
+    host: str = "localhost"
+    port: int = 45100
 
 
 class BackendsConfig(BaseModel):
@@ -109,8 +112,6 @@ class PiperConfig(BaseModel):
 
 
 class KokoroConfig(BaseModel):
-    """Kokoro FastAPI — OpenAI-compatible TTS (/v1/audio/speech)."""
-
     host: str = "localhost"
     port: int = 45130
     model: str = "kokoro"
@@ -161,7 +162,6 @@ class AppConfig(BaseModel):
 
     @property
     def tts_sample_rate(self) -> int:
-        """Active TTS backend sample rate."""
         match self.tts.backend:
             case TTSBackend.KOKORO:
                 return self.tts.kokoro.sample_rate
@@ -170,7 +170,6 @@ class AppConfig(BaseModel):
 
     @model_validator(mode="after")
     def cascade_language(self) -> AppConfig:
-        """Propagate top-level language to STT and TTS when at defaults."""
         lang = self.language
         if self.stt.whisperlive.language == "en" and lang != "en":
             self.stt.whisperlive.language = lang
@@ -191,16 +190,17 @@ class AppConfig(BaseModel):
 class Settings(BaseSettings):
     """Environment-level settings (secrets, runtime paths)."""
 
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
     ENVIRONMENT: str = "DEV"
     LOG_LEVEL: str = "debug"
     SOCKET_PATH: str = "/tmp/e-claw.sock"
+    AGENT_BACKEND: AgentBackend | None = None
 
     BASE_DIR: ClassVar[Path] = Path(__file__).resolve().parent.parent.parent.parent
     DATA_DIR: ClassVar[Path] = BASE_DIR / "data"
     CONFIG_PATH: ClassVar[Path] = BASE_DIR / "config.yaml"
     MODELS_DIR: ClassVar[Path] = BASE_DIR / "models"
-
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @property
     def is_dev(self) -> bool:
@@ -211,8 +211,9 @@ settings = Settings()
 
 
 def load_config(path: Path | None = None) -> AppConfig:
-    """Load AppConfig from YAML, falling back to defaults."""
+    """Load AppConfig from YAML. AGENT_BACKEND env var overrides yaml when set."""
     config_path = path or settings.CONFIG_PATH
-    if config_path.exists():
-        return AppConfig.from_yaml(config_path)
-    return AppConfig()
+    config = AppConfig.from_yaml(config_path) if config_path.exists() else AppConfig()
+    if settings.AGENT_BACKEND is not None:
+        config.agent.backend = settings.AGENT_BACKEND
+    return config

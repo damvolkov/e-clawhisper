@@ -1,30 +1,56 @@
-"""Generic LLM agent adapter — OpenAI-compatible SSE streaming via httpx."""
+"""Generic LLM agent adapter — multi-provider streaming via PydanticAI."""
 
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
 
-import httpx
-import orjson
+from pydantic_ai import Agent
+from pydantic_ai.models import Model
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
 
+from e_clawhisper.daemon.adapters.agent.base import AgentAdapter
 from e_clawhisper.shared.logger import logger
-from e_clawhisper.shared.settings import GenericLLMConfig
+from e_clawhisper.shared.settings import GenericLLMConfig, LLMProvider
+
+##### MODEL FACTORY #####
+
+_PROVIDER_MODELS: dict[LLMProvider, str] = {
+    LLMProvider.GEMINI: "gemini-2.0-flash",
+    LLMProvider.OPENAI: "openai:gpt-4o-mini",
+    LLMProvider.ANTHROPIC: "anthropic:claude-sonnet-4-20250514",
+}
 
 
-class GenericAdapter:
-    """OpenAI-compatible chat completions with SSE streaming."""
+def _build_model(config: GenericLLMConfig) -> Model | str:
+    """Build PydanticAI model from config — vLLM uses custom OpenAI provider."""
+    match config.provider:
+        case LLMProvider.VLLM:
+            provider = OpenAIProvider(
+                base_url=f"http://{config.host}:{config.port}/v1",
+                api_key=config.api_key or "no-key",
+            )
+            return OpenAIChatModel(config.model, provider=provider)
+        case LLMProvider.GEMINI | LLMProvider.OPENAI | LLMProvider.ANTHROPIC:
+            return config.model if config.model != "default" else _PROVIDER_MODELS[config.provider]
+        case _:
+            msg = f"Unsupported LLM provider: {config.provider}"
+            raise ValueError(msg)
 
-    __slots__ = ("_base_url", "_model", "_timeout", "_system_prompt", "_api_key", "_client", "_messages", "_agent_id")
+
+##### ADAPTER #####
+
+
+class GenericAdapter(AgentAdapter):
+    """Multi-provider LLM adapter — Gemini, OpenAI, Anthropic, vLLM."""
+
+    __slots__ = ("_config", "_agent", "_agent_id", "_connected")
 
     def __init__(self, config: GenericLLMConfig) -> None:
-        self._base_url = f"http://{config.host}:{config.port}"
-        self._model = config.model
-        self._timeout = config.timeout
-        self._system_prompt = config.system_prompt
-        self._api_key = config.api_key
-        self._client: httpx.AsyncClient | None = None
-        self._messages: list[dict[str, str]] = []
+        self._config = config
+        self._agent: Agent[None, str] | None = None
         self._agent_id: str = ""
+        self._connected: bool = False
 
     @property
     def agent_id(self) -> str:
@@ -34,64 +60,36 @@ class GenericAdapter:
 
     async def connect(self, agent_id: str) -> None:
         self._agent_id = agent_id
-        headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
-        self._client = httpx.AsyncClient(
-            base_url=self._base_url,
-            headers=headers,
-            timeout=httpx.Timeout(connect=10.0, read=self._timeout, write=10.0, pool=10.0),
+        model = _build_model(self._config)
+        self._agent = Agent(
+            model=model,
+            system_prompt=self._config.system_prompt,
         )
-        self._messages = [{"role": "system", "content": self._system_prompt}]
-        logger.system("OK", f"generic LLM connected model={self._model}")
+        self._connected = True
+        logger.system("OK", f"LLM connected provider={self._config.provider} model={self._config.model}")
 
     async def disconnect(self) -> None:
-        if self._client:
-            await self._client.aclose()
-            self._client = None
-        self._messages.clear()
-        logger.system("STOP", "generic LLM disconnected")
+        self._agent = None
+        self._connected = False
+        logger.system("STOP", "LLM disconnected")
 
     async def is_connected(self) -> bool:
-        return self._client is not None
+        return self._connected and self._agent is not None
 
     ##### MESSAGING #####
 
     async def send(self, text: str) -> AsyncIterator[str]:
-        if not self._client:
-            msg = "generic LLM not connected"
+        if not self._agent:
+            msg = "LLM not connected"
             raise ConnectionError(msg)
 
-        self._messages.append({"role": "user", "content": text})
-
-        payload = {
-            "model": self._model,
-            "messages": list(self._messages),
-            "stream": True,
-        }
-
-        full_response = ""
-        try:
-            async with self._client.stream("POST", "/v1/chat/completions", json=payload) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if not line.startswith("data: "):
-                        continue
-                    data = line.removeprefix("data: ").strip()
-                    if data == "[DONE]":
-                        break
-                    chunk = orjson.loads(data)
-                    choices = chunk.get("choices") or [{}]
-                    if content := choices[0].get("delta", {}).get("content"):
-                        full_response += content
-                        yield content
-        finally:
-            if full_response:
-                self._messages.append({"role": "assistant", "content": full_response})
-            else:
-                self._messages.pop()
+        async with self._agent.run_stream(text) as result:
+            async for delta in result.stream_text(delta=True):
+                yield delta
 
     ##### RESOLUTION #####
 
     async def resolve_agent_id(self, agent_name: str) -> str:
-        agent_id = f"{agent_name}@{self._model}"
-        logger.system("OK", f"resolved generic agent '{agent_name}' → {agent_id}")
+        agent_id = f"{agent_name}@{self._config.provider}:{self._config.model}"
+        logger.system("OK", f"resolved agent '{agent_name}' → {agent_id}")
         return agent_id
