@@ -16,6 +16,11 @@ vad:
   silence_duration: 1.5
   min_recording_time: 1.0
 
+conversation:
+  enabled: true
+  loop_timeout: 2.0
+  max_turns: 10
+
 backends:
   openfang:
     host: 127.0.0.1

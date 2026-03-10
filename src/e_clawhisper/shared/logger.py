@@ -29,6 +29,13 @@ _TURN_COLORS: dict[str, str] = {
     "DEFAULT": "60;179;113",
 }
 
+_LOOP_COLORS: dict[str, str] = {
+    "SILENCE": "139;119;42",
+    "NOISE": "184;134;11",
+    "VOICE": "255;215;0",
+    "DEFAULT": "218;165;32",
+}
+
 _SYSTEM_COLORS: dict[str, str] = {
     "START": "255;215;0",
     "STOP": "255;165;0",
@@ -85,6 +92,8 @@ class PipelineRenderer:
                 return _SENTINEL_COLORS.get(step, _SENTINEL_COLORS["DEFAULT"])
             case "TURN":
                 return _TURN_COLORS.get(step, _TURN_COLORS["DEFAULT"])
+            case "LOOP":
+                return _LOOP_COLORS.get(step, _LOOP_COLORS["DEFAULT"])
             case _:
                 return _SYSTEM_COLORS.get(step, _SYSTEM_COLORS["DEFAULT"])
 
@@ -140,6 +149,19 @@ class PipelineLogger:
             return
         self._last_debug = now
         self._log.debug(msg, pipeline="TURN", step=step, **kw)
+
+    ##### LOOP #####
+
+    def loop(self, step: str, msg: str = "", **kw: Any) -> None:
+        self._log.info(msg, pipeline="LOOP", step=step, **kw)
+
+    def loop_debug(self, step: str, msg: str = "", **kw: Any) -> None:
+        now = time.monotonic()
+        if step == self._last_step and now - self._last_debug < self._idle_interval:
+            return
+        self._last_debug = now
+        self._last_step = step
+        self._log.debug(msg, pipeline="LOOP", step=step, **kw)
 
     ##### SYSTEM #####
 

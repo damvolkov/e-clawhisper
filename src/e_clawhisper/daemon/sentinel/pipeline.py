@@ -1,7 +1,9 @@
-"""Sentinel pipeline — passive listening loop.
+"""Sentinel pipeline — passive listening with layered architecture.
 
 3-layer parallel pipeline: Energy gate → [Silero VAD ‖ OpenWakeWord].
-Runs until wake word detected, then signals orchestrator via asyncio.Event.
+Layers can be used independently:
+  - run()            → full pipeline (layers 1-2-3): energy → VAD → wakeword
+  - wait_for_voice() → partial pipeline (layers 1-2): energy → VAD only
 """
 
 from __future__ import annotations
@@ -54,8 +56,10 @@ class SentinelPipeline:
     def wakeword_name(self) -> str:
         return self._ww.name
 
+    ##### FULL PIPELINE (LAYERS 1-2-3) #####
+
     async def run(self, audio_queue: asyncio.Queue[np.ndarray]) -> None:
-        """Main loop — reads from shared audio queue until wakeword or stopped."""
+        """Full pipeline — energy gate → VAD → wakeword. Blocks until wakeword or stopped."""
         self._audio_queue = audio_queue
         self._running = True
         self.wakeword_detected.clear()
@@ -63,11 +67,7 @@ class SentinelPipeline:
         self._ww.reset()
         loop = asyncio.get_running_loop()
 
-        # Cooldown: discard audio frames to let speaker echo dissipate
-        if self._cooldown > 0:
-            deadline = monotonic() + self._cooldown
-            while monotonic() < deadline and self._running:
-                await audio_queue.get()
+        await self._drain_cooldown(audio_queue)
 
         logger.sentinel("DEFAULT", f"listening for '{self._ww.name}'")
 
@@ -79,7 +79,7 @@ class SentinelPipeline:
             ww_future = loop.run_in_executor(self._executor, self._ww.feed, audio)
 
             if energy < self._energy_floor:
-                await ww_future  # drain to keep OWW state advancing
+                await ww_future
                 logger.sentinel_debug("SILENCE", e=f"{energy:.4f}")
                 continue
 
@@ -104,6 +104,61 @@ class SentinelPipeline:
                 )
                 self.wakeword_detected.set()
                 return
+
+    ##### PARTIAL PIPELINE (LAYERS 1-2) #####
+
+    async def wait_for_voice(
+        self,
+        audio_queue: asyncio.Queue[np.ndarray],
+        timeout: float,
+    ) -> bool:
+        """Layers 1-2 only — energy gate → VAD. Returns True if voice detected within timeout."""
+        self._running = True
+        self._vad.reset()
+        loop = asyncio.get_running_loop()
+
+        await self._drain_cooldown(audio_queue)
+
+        logger.loop("DEFAULT", f"waiting for voice ({timeout:.1f}s)")
+
+        deadline = monotonic() + timeout
+        while self._running:
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                break
+
+            try:
+                audio = await asyncio.wait_for(audio_queue.get(), timeout=remaining)
+            except TimeoutError:
+                break
+
+            energy = float(np.sqrt(np.mean(audio**2)))
+
+            if energy < self._energy_floor:
+                logger.loop_debug("SILENCE", e=f"{energy:.4f}")
+                continue
+
+            vad_prob = await loop.run_in_executor(self._executor, self._vad, audio)
+
+            if vad_prob < self._vad.threshold:
+                logger.loop_debug("NOISE", vad=f"{vad_prob:.2f}", e=f"{energy:.4f}")
+                continue
+
+            logger.loop("VOICE", "speech detected, continuing", vad=f"{vad_prob:.2f}")
+            return True
+
+        logger.loop("DEFAULT", "silence timeout, ending conversation")
+        return False
+
+    ##### SHARED #####
+
+    async def _drain_cooldown(self, audio_queue: asyncio.Queue[np.ndarray]) -> None:
+        """Discard audio frames during cooldown to let speaker echo dissipate."""
+        if self._cooldown <= 0:
+            return
+        deadline = monotonic() + self._cooldown
+        while monotonic() < deadline and self._running:
+            await audio_queue.get()
 
     async def stop(self) -> None:
         self._running = False

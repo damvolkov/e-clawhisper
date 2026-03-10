@@ -132,6 +132,12 @@ class AgentConfig(BaseModel):
     backend: AgentBackend = AgentBackend.OPENFANG
 
 
+class ConversationConfig(BaseModel):
+    enabled: bool = True
+    loop_timeout: float = 2.0
+    max_turns: int = 10
+
+
 class AudioConfig(BaseModel):
     sample_rate: int = 16000
     channels: int = 1
@@ -154,6 +160,7 @@ class AppConfig(BaseModel):
     agent: AgentConfig = AgentConfig()
     sentinel: SentinelConfig = SentinelConfig()
     vad: VADConfig = VADConfig()
+    conversation: ConversationConfig = ConversationConfig()
     backends: BackendsConfig = BackendsConfig()
     stt: STTConfig = STTConfig()
     tts: TTSConfig = TTSConfig()

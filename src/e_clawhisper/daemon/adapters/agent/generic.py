@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 
 from pydantic_ai import Agent
+from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models import Model
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
@@ -44,13 +45,14 @@ def _build_model(config: GenericLLMConfig) -> Model | str:
 class GenericAdapter(AgentAdapter):
     """Multi-provider LLM adapter — Gemini, OpenAI, Anthropic, vLLM."""
 
-    __slots__ = ("_config", "_agent", "_agent_id", "_connected")
+    __slots__ = ("_config", "_agent", "_agent_id", "_connected", "_message_history")
 
     def __init__(self, config: GenericLLMConfig) -> None:
         self._config = config
         self._agent: Agent[None, str] | None = None
         self._agent_id: str = ""
         self._connected: bool = False
+        self._message_history: list[ModelMessage] = []
 
     @property
     def agent_id(self) -> str:
@@ -71,6 +73,7 @@ class GenericAdapter(AgentAdapter):
     async def disconnect(self) -> None:
         self._agent = None
         self._connected = False
+        self._message_history.clear()
         logger.system("STOP", "LLM disconnected")
 
     async def is_connected(self) -> bool:
@@ -83,9 +86,14 @@ class GenericAdapter(AgentAdapter):
             msg = "LLM not connected"
             raise ConnectionError(msg)
 
-        async with self._agent.run_stream(text) as result:
+        history: Sequence[ModelMessage] | None = self._message_history or None
+        async with self._agent.run_stream(text, message_history=history) as result:
             async for delta in result.stream_text(delta=True):
                 yield delta
+            self._message_history = result.all_messages()
+
+    def clear_history(self) -> None:
+        self._message_history.clear()
 
     ##### RESOLUTION #####
 

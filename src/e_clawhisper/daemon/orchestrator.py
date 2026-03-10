@@ -1,11 +1,12 @@
-"""Orchestrator — state machine SENTINEL ↔ TURN.
+"""Orchestrator — state machine SENTINEL → TURN ⇄ LOOP.
 
-┌──────────┐  WakewordEvent   ┌──────┐
-│ SENTINEL │ ───────────────► │ TURN │
-│          │ ◄─────────────── │      │
-└──────────┘  TurnComplete    └──────┘
+┌──────────┐  WakewordEvent   ┌──────┐  TurnComplete   ┌──────┐
+│ SENTINEL │ ───────────────► │ TURN │ ───────────────► │ LOOP │
+│          │ ◄─────────────── │      │ ◄─────────────── │      │
+└──────────┘  silence timeout └──────┘  voice detected  └──────┘
 
-Does NOT process audio — only manages pipeline transitions.
+LOOP reuses SentinelPipeline layers 1-2 (energy + VAD) to detect
+follow-up speech without requiring a wakeword.
 """
 
 from __future__ import annotations
@@ -31,10 +32,11 @@ from e_clawhisper.shared.settings import AgentBackend, AppConfig, STTBackend, TT
 class PipelinePhase(StrEnum):
     SENTINEL = auto()
     TURN = auto()
+    LOOP = auto()
 
 
 class Orchestrator:
-    """Assembles adapters, manages SENTINEL ↔ TURN transitions."""
+    """Assembles adapters, manages SENTINEL → TURN ⇄ LOOP transitions."""
 
     __slots__ = (
         "_config",
@@ -46,6 +48,7 @@ class Orchestrator:
         "_turn",
         "_phase",
         "_running",
+        "_conversation_turns",
     )
 
     def __init__(self, config: AppConfig) -> None:
@@ -70,6 +73,7 @@ class Orchestrator:
 
         self._phase = PipelinePhase.SENTINEL
         self._running = False
+        self._conversation_turns = 0
 
     @property
     def phase(self) -> PipelinePhase:
@@ -114,6 +118,8 @@ class Orchestrator:
                     await self._run_sentinel()
                 case PipelinePhase.TURN:
                     await self._run_turn()
+                case PipelinePhase.LOOP:
+                    await self._run_conversation_loop()
 
     async def _run_sentinel(self) -> None:
         logger.set_pipeline("SENTINEL")
@@ -126,7 +132,7 @@ class Orchestrator:
         logger.set_pipeline("TURN")
 
         if not await self._ensure_agent():
-            self._phase = PipelinePhase.SENTINEL
+            self._end_conversation()
             return
 
         try:
@@ -140,15 +146,52 @@ class Orchestrator:
         self._audio.drain()
 
         match result:
+            case TurnComplete() if self._should_loop():
+                self._conversation_turns += 1
+                logger.turn(
+                    "DEFAULT",
+                    f"turn {self._conversation_turns} complete ({result.duration:.1f}s)",
+                    transcript=logger.truncate(result.transcript, 60),
+                )
+                self._phase = PipelinePhase.LOOP
             case TurnComplete():
                 logger.turn(
                     "DEFAULT",
                     f"turn complete ({result.duration:.1f}s)",
                     transcript=logger.truncate(result.transcript, 60),
                 )
+                self._end_conversation()
             case TurnError():
                 logger.warning(f"turn failed: {result.reason}")
+                self._end_conversation()
 
+    async def _run_conversation_loop(self) -> None:
+        logger.set_pipeline("LOOP")
+
+        voice_detected = await self._sentinel.wait_for_voice(
+            self._audio.queue,
+            timeout=self._config.conversation.loop_timeout,
+        )
+
+        self._audio.drain()
+
+        if voice_detected and self._running:
+            self._phase = PipelinePhase.TURN
+        else:
+            self._end_conversation()
+
+    ##### CONVERSATION #####
+
+    def _should_loop(self) -> bool:
+        conv = self._config.conversation
+        return conv.enabled and self._conversation_turns < conv.max_turns
+
+    def _end_conversation(self) -> None:
+        if self._conversation_turns > 0:
+            logger.loop("DEFAULT", f"conversation ended ({self._conversation_turns} turns)")
+            if isinstance(self._agent, GenericAdapter):
+                self._agent.clear_history()
+        self._conversation_turns = 0
         self._phase = PipelinePhase.SENTINEL
 
     ##### SERVICE HEALTH #####
