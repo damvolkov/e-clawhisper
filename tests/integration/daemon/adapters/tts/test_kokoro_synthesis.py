@@ -13,7 +13,7 @@ import pytest
 from e_clawhisper.daemon.adapters.tts.kokoro import KokoroAdapter
 from e_clawhisper.shared.settings import KokoroConfig
 
-_CONFIG = KokoroConfig(host="localhost", port=45130, voice="em_alex", sample_rate=24000)
+_CONFIG = KokoroConfig(url="http://localhost:45130", voice="em_alex", sample_rate=24000)
 _SAMPLE_RATE = 24000
 
 

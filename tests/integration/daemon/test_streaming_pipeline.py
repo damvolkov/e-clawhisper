@@ -16,8 +16,8 @@ from e_clawhisper.daemon.adapters.agent.openfang import OpenfangAdapter
 from e_clawhisper.daemon.adapters.tts.piper import PiperAdapter
 from e_clawhisper.shared.settings import OpenFangConfig, PiperConfig
 
-_AGENT_CONFIG = OpenFangConfig(host="127.0.0.1", port=4200, timeout=30.0)
-_TTS_CONFIG = PiperConfig(host="localhost", port=10200, sample_rate=22050)
+_AGENT_CONFIG = OpenFangConfig(url="http://127.0.0.1:4200", timeout=30.0)
+_TTS_CONFIG = PiperConfig(url="tcp://localhost:10200", sample_rate=22050)
 _AGENT_NAME = "damien"
 
 

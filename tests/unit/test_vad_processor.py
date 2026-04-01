@@ -122,7 +122,7 @@ def test_speech_resets_silence_count() -> None:
 
 def test_should_stop_requires_speech_then_silence(monkeypatch: pytest.MonkeyPatch) -> None:
     max_sil = 3
-    cfg = _make_config(silence_duration=max_sil * _WINDOW / _SR, min_recording_time=0.0)
+    cfg = _make_config(silence_duration=max_sil * _WINDOW / _SR, min_recording_time=0.001)
     probs = [0.9] + [0.1] * max_sil
     detector = _make_detector(config=cfg, probabilities=probs)
 
@@ -137,7 +137,7 @@ def test_should_stop_requires_speech_then_silence(monkeypatch: pytest.MonkeyPatc
 
 
 def test_should_stop_false_without_prior_speech() -> None:
-    cfg = _make_config(silence_duration=0.0, min_recording_time=0.0)
+    cfg = _make_config(silence_duration=0.001, min_recording_time=0.001)
     detector = _make_detector(config=cfg, probabilities=[0.1, 0.1])
     result = EndOfSpeechResult(is_speech=False, should_stop=False, probability=0.0)
     for _ in range(2):

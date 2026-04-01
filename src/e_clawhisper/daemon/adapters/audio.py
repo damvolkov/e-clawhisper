@@ -9,7 +9,12 @@ from collections import deque
 import numpy as np
 import sounddevice as sd
 
+from e_clawhisper.shared.logger import logger
 from e_clawhisper.shared.settings import AudioConfig
+
+_MAX_RETRIES = 30
+_BASE_DELAY = 2.0
+_MAX_DELAY = 30.0
 
 
 class AudioAdapter:
@@ -62,14 +67,23 @@ class AudioAdapter:
 
     async def start(self) -> None:
         self._loop = asyncio.get_running_loop()
-        self._stream = sd.InputStream(
-            samplerate=self._sample_rate,
-            channels=self._channels,
-            blocksize=self._chunk_size,
-            dtype="float32",
-            callback=self._audio_callback,
-        )
-        self._stream.start()
+        for attempt in range(_MAX_RETRIES):
+            try:
+                self._stream = sd.InputStream(
+                    samplerate=self._sample_rate,
+                    channels=self._channels,
+                    blocksize=self._chunk_size,
+                    dtype="float32",
+                    callback=self._audio_callback,
+                )
+                self._stream.start()
+                return
+            except sd.PortAudioError as exc:
+                delay = min(_BASE_DELAY * (2 ** attempt), _MAX_DELAY)
+                logger.system("WARN", f"audio device unavailable ({exc}), retry {attempt + 1}/{_MAX_RETRIES} in {delay:.0f}s")
+                await asyncio.sleep(delay)
+        msg = f"audio device not available after {_MAX_RETRIES} retries"
+        raise sd.PortAudioError(msg)
 
     async def stop(self) -> None:
         if self._stream:

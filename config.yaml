@@ -23,29 +23,24 @@ conversation:
 
 backends:
   openfang:
-    host: 127.0.0.1
-    port: 4200
+    url: http://127.0.0.1:4200
     timeout: 30.0
   generic:
     provider: gemini  # gemini | openai | anthropic | vllm
     model: gemini-2.0-flash
     timeout: 60.0
-    # vllm only
-    host: localhost
-    port: 45100
+    url: http://localhost:45100  # vllm only
 
 stt:
   backend: whisperlive
   whisperlive:
-    host: localhost
-    port: 45120
+    url: ws://localhost:45120
     model: large-v3-turbo
 
 tts:
   backend: kokoro
   kokoro:
-    host: localhost
-    port: 45130
+    url: http://localhost:45130
     voice: em_alex
     sample_rate: 24000
 

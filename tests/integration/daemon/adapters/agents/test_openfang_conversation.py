@@ -14,7 +14,7 @@ import pytest
 from e_clawhisper.daemon.adapters.agent.openfang import OpenfangAdapter
 from e_clawhisper.shared.settings import OpenFangConfig
 
-_CONFIG = OpenFangConfig(host="127.0.0.1", port=4200, timeout=30.0)
+_CONFIG = OpenFangConfig(url="http://127.0.0.1:4200", timeout=30.0)
 _AGENT_NAME = "damien"
 
 pytestmark = pytest.mark.skipif(

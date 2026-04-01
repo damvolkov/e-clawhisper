@@ -211,3 +211,6 @@ __marimo__/
 models/*/**
 !models/*/.gitkeep
 *.onnx
+
+data/
+data/*/**

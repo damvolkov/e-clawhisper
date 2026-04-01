@@ -1,4 +1,4 @@
-.PHONY: install sync lint type test check run start stop status infra down script help _ensure-stt _ensure-tts
+.PHONY: install sync lint type test check run start stop status infra down script help deb clean-dist _ensure-stt _ensure-tts
 
 install: ## Install all dependencies
 	uv sync --dev
@@ -62,6 +62,12 @@ _ensure-tts:
 		       sleep 1; \
 		     done; \
 		     echo '✗ TTS timeout'; exit 1; }
+
+deb: ## Build .deb package
+	@./packaging/build.sh
+
+clean-dist: ## Clean build artifacts
+	@rm -rf dist/
 
 script: ## Run a test script (e.g. make script sentinel [args])
 	$(eval _ARGS := $(filter-out $@ script,$(MAKECMDGOALS)))

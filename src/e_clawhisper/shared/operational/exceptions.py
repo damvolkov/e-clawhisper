@@ -17,3 +17,11 @@ class PipelineError(AppError):
 
 class ModelNotFoundError(AppError):
     """ML model file not found."""
+
+
+class ConfigError(AppError):
+    """Invalid or missing configuration."""
+
+
+class HealthCheckError(AppError):
+    """Service health check failed."""

@@ -42,6 +42,7 @@ dev = [
     "ruff>=0.14.0",
     "pre-commit>=4.4.0",
     "ty>=0.0.5",
+    "pytest-cov>=7.0.0",
 ]
 
 [tool.hatch.version]
@@ -60,6 +61,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 filterwarnings = ["ignore::DeprecationWarning"]
+addopts = "--import-mode=importlib"
 
 [tool.ruff]
 line-length = 120

@@ -4,11 +4,21 @@ from __future__ import annotations
 
 from enum import StrEnum, auto
 from pathlib import Path
-from typing import ClassVar
+from typing import Annotated, ClassVar, Literal
+from urllib.parse import urlparse
 
 import yaml
-from pydantic import BaseModel, model_validator
+from annotated_types import Ge, Gt, Le
+from pydantic import AnyUrl, BaseModel, ConfigDict, HttpUrl, UrlConstraints, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+##### TYPES #####
+
+Probability = Annotated[float, Ge(0.0), Le(1.0)]
+PositiveSeconds = Annotated[float, Gt(0.0)]
+PositiveInt = Annotated[int, Gt(0)]
+WebSocketUrl = Annotated[AnyUrl, UrlConstraints(allowed_schemes=["ws", "wss"])]
+TcpUrl = Annotated[AnyUrl, UrlConstraints(allowed_schemes=["tcp"])]
 
 ##### ENUMS #####
 
@@ -34,6 +44,18 @@ class TTSBackend(StrEnum):
     KOKORO = auto()
 
 
+class Environment(StrEnum):
+    DEV = "DEV"
+    PROD = "PROD"
+
+
+class LogLevel(StrEnum):
+    DEBUG = auto()
+    INFO = auto()
+    WARNING = auto()
+    ERROR = auto()
+
+
 ##### CONSTANTS #####
 
 _DEFAULT_VOICES: dict[str, str] = {
@@ -49,114 +71,153 @@ _DEFAULT_VOICES: dict[str, str] = {
 
 
 class WakewordConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     model: str = "alexa"
-    threshold: float = 0.5
+    threshold: Probability = 0.5
 
 
 class SentinelConfig(BaseModel):
-    energy_floor: float = 0.01
-    vad_threshold: float = 0.5
-    cooldown: float = 1.5
+    model_config = ConfigDict(extra="forbid")
+
+    energy_floor: Probability = 0.01
+    vad_threshold: Probability = 0.5
+    cooldown: PositiveSeconds = 1.5
     wakeword: WakewordConfig = WakewordConfig()
 
 
 class VADConfig(BaseModel):
-    threshold: float = 0.5
-    silence_duration: float = 1.5
-    min_recording_time: float = 1.0
+    model_config = ConfigDict(extra="forbid")
+
+    threshold: Probability = 0.5
+    silence_duration: PositiveSeconds = 1.5
+    min_recording_time: PositiveSeconds = 1.0
 
 
 class OpenFangConfig(BaseModel):
-    host: str = "127.0.0.1"
-    port: int = 4200
-    timeout: float = 30.0
+    model_config = ConfigDict(extra="forbid")
+
+    url: HttpUrl = "http://127.0.0.1:4200"
+    timeout: PositiveSeconds = 30.0
+
+    @property
+    def ws_base(self) -> str:
+        """Derive WebSocket base from HTTP URL."""
+        return str(self.url).rstrip("/").replace("http://", "ws://").replace("https://", "wss://")
 
 
 class GenericLLMConfig(BaseModel):
     """Multi-provider LLM config (PydanticAI)."""
 
+    model_config = ConfigDict(extra="forbid")
+
     provider: LLMProvider = LLMProvider.GEMINI
     model: str = "gemini-2.0-flash"
     api_key: str = ""
-    timeout: float = 60.0
+    timeout: PositiveSeconds = 60.0
     system_prompt: str = "You are a helpful voice assistant. Keep responses concise and conversational."
-    # vLLM only
-    host: str = "localhost"
-    port: int = 45100
+    url: HttpUrl = "http://localhost:45100"
 
 
 class BackendsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     openfang: OpenFangConfig = OpenFangConfig()
     generic: GenericLLMConfig = GenericLLMConfig()
 
 
 class WhisperLiveConfig(BaseModel):
-    host: str = "localhost"
-    port: int = 45120
+    model_config = ConfigDict(extra="forbid")
+
+    url: WebSocketUrl = "ws://localhost:45120"
     model: str = "large-v3"
     language: str = "en"
-    finish_timeout: float = 5.0
+    finish_timeout: PositiveSeconds = 5.0
 
 
 class STTConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     backend: STTBackend = STTBackend.WHISPERLIVE
     whisperlive: WhisperLiveConfig = WhisperLiveConfig()
 
 
 class PiperConfig(BaseModel):
-    host: str = "localhost"
-    port: int = 45130
+    model_config = ConfigDict(extra="forbid")
+
+    url: TcpUrl = "tcp://localhost:45130"
     voice: str = "es_ES-davefx-medium"
-    sample_rate: int = 22050
-    disconnect_timeout: float = 0.5
+    sample_rate: PositiveInt = 22050
+    disconnect_timeout: PositiveSeconds = 0.5
+
+    @property
+    def host(self) -> str:
+        return urlparse(str(self.url)).hostname or "localhost"
+
+    @property
+    def port(self) -> int:
+        return urlparse(str(self.url)).port or 10200
 
 
 class KokoroConfig(BaseModel):
-    host: str = "localhost"
-    port: int = 45130
+    model_config = ConfigDict(extra="forbid")
+
+    url: HttpUrl = "http://localhost:45130"
     model: str = "kokoro"
     voice: str = "em_alex"
-    sample_rate: int = 24000
-    response_format: str = "pcm"
-    timeout: float = 30.0
+    sample_rate: PositiveInt = 24000
+    response_format: Literal["pcm", "wav", "mp3", "opus", "flac"] = "pcm"
+    timeout: PositiveSeconds = 30.0
 
 
 class TTSConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     backend: TTSBackend = TTSBackend.KOKORO
     piper: PiperConfig = PiperConfig()
     kokoro: KokoroConfig = KokoroConfig()
 
 
 class AgentConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str = "damien"
     backend: AgentBackend = AgentBackend.OPENFANG
 
 
 class ConversationConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     enabled: bool = True
-    loop_timeout: float = 2.0
-    max_turns: int = 10
+    loop_timeout: PositiveSeconds = 2.0
+    max_turns: PositiveInt = 10
 
 
 class AudioConfig(BaseModel):
-    sample_rate: int = 16000
-    channels: int = 1
-    chunk_size: int = 512
-    queue_size: int = 100
-    pcm_queue_size: int = 20
-    playback_latency: str = "high"
+    model_config = ConfigDict(extra="forbid")
+
+    sample_rate: PositiveInt = 16000
+    channels: PositiveInt = 1
+    chunk_size: PositiveInt = 512
+    queue_size: PositiveInt = 100
+    pcm_queue_size: PositiveInt = 20
+    playback_latency: Literal["low", "medium", "high"] = "high"
 
 
 class LoggingConfig(BaseModel):
-    idle_interval: float = 0.25
-    turn_interval: float = 0.25
+    model_config = ConfigDict(extra="forbid")
+
+    idle_interval: PositiveSeconds = 0.25
+    turn_interval: PositiveSeconds = 0.25
 
 
 class AppConfig(BaseModel):
     """Application config loaded from config.yaml."""
 
+    model_config = ConfigDict(extra="forbid")
+
     language: str = "en"
-    turn_timeout: float = 300.0
+    turn_timeout: PositiveSeconds = 300.0
     agent: AgentConfig = AgentConfig()
     sentinel: SentinelConfig = SentinelConfig()
     vad: VADConfig = VADConfig()
@@ -190,8 +251,33 @@ class AppConfig(BaseModel):
             data = yaml.safe_load(f)
         return cls.model_validate(data or {})
 
+    @classmethod
+    def load(cls, path: Path | None = None) -> AppConfig:
+        """Load from YAML with env overrides applied."""
+        config_path = path or settings.CONFIG_PATH
+        data = yaml.safe_load(config_path.read_text()) if config_path.exists() else {}
+        if (backend := settings.AGENT_BACKEND) is not None:
+            data.setdefault("agent", {})["backend"] = backend
+        return cls.model_validate(data or {})
+
 
 ##### ENV SETTINGS #####
+
+_BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+
+_XDG_CONFIG = Path.home() / ".config" / "e-clawhisper"
+_ETC_CONFIG = Path("/etc/e-clawhisper")
+
+_CONFIG_CANDIDATES = (
+    _XDG_CONFIG / "config.yaml",
+    _ETC_CONFIG / "config.yaml",
+    _BASE_DIR / "config.yaml",
+)
+
+
+def _resolve_config_path() -> Path:
+    """Resolve config: $CONFIG_PATH env > ~/.config > /etc > ./config.yaml."""
+    return next((p for p in _CONFIG_CANDIDATES if p.exists()), _BASE_DIR / "config.yaml")
 
 
 class Settings(BaseSettings):
@@ -199,28 +285,28 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    ENVIRONMENT: str = "DEV"
-    LOG_LEVEL: str = "debug"
+    ENVIRONMENT: Environment = Environment.DEV
+    LOG_LEVEL: LogLevel = LogLevel.DEBUG
     SOCKET_PATH: str = "/tmp/e-claw.sock"
     AGENT_BACKEND: AgentBackend | None = None
 
-    BASE_DIR: ClassVar[Path] = Path(__file__).resolve().parent.parent.parent.parent
-    DATA_DIR: ClassVar[Path] = BASE_DIR / "data"
-    CONFIG_PATH: ClassVar[Path] = BASE_DIR / "config.yaml"
-    MODELS_DIR: ClassVar[Path] = BASE_DIR / "models"
+    # Paths — CONFIG_PATH env var overrides the XDG/etc/dev resolution chain
+    CONFIG_PATH: Path | None = None
+    MODELS_DIR: Path = _BASE_DIR / "models"
+    DATA_DIR: Path = _BASE_DIR / "data"
+
+    BASE_DIR: ClassVar[Path] = _BASE_DIR
+    XDG_CONFIG_DIR: ClassVar[Path] = _XDG_CONFIG
+
+    @model_validator(mode="after")
+    def _resolve_paths(self) -> Settings:
+        if self.CONFIG_PATH is None:
+            self.CONFIG_PATH = _resolve_config_path()
+        return self
 
     @property
     def is_dev(self) -> bool:
-        return self.ENVIRONMENT == "DEV"
+        return self.ENVIRONMENT is Environment.DEV
 
 
 settings = Settings()
-
-
-def load_config(path: Path | None = None) -> AppConfig:
-    """Load AppConfig from YAML. AGENT_BACKEND env var overrides yaml when set."""
-    config_path = path or settings.CONFIG_PATH
-    config = AppConfig.from_yaml(config_path) if config_path.exists() else AppConfig()
-    if settings.AGENT_BACKEND is not None:
-        config.agent.backend = settings.AGENT_BACKEND
-    return config

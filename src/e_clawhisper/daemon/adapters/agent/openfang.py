@@ -20,13 +20,12 @@ _RESPONSE_TYPES = frozenset({"text_delta", "response", "typing", "tool_start", "
 class OpenfangAdapter:
     """Persistent WebSocket to OpenFang agent with background message dispatch."""
 
-    __slots__ = ("_host", "_port", "_timeout", "_base_url", "_ws", "_agent_id", "_response_queue", "_recv_task")
+    __slots__ = ("_timeout", "_base_url", "_ws_base", "_ws", "_agent_id", "_response_queue", "_recv_task")
 
     def __init__(self, config: OpenFangConfig) -> None:
-        self._host = config.host
-        self._port = config.port
         self._timeout = config.timeout
-        self._base_url = f"http://{config.host}:{config.port}"
+        self._base_url = str(config.url).rstrip("/")
+        self._ws_base = config.ws_base
         self._ws: ClientConnection | None = None
         self._agent_id: str = ""
         self._response_queue: asyncio.Queue[dict[str, object]] = asyncio.Queue()
@@ -40,7 +39,7 @@ class OpenfangAdapter:
 
     async def connect(self, agent_id: str) -> None:
         self._agent_id = agent_id
-        ws_url = f"ws://{self._host}:{self._port}/api/agents/{agent_id}/ws"
+        ws_url = f"{self._ws_base}/api/agents/{agent_id}/ws"
         self._ws = await websockets.connect(ws_url)
 
         connected_msg = await self._ws.recv()

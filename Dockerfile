@@ -62,4 +62,4 @@ ENV PYTHONPATH="/app/src"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-CMD ["clawhisper", "run"]
+CMD ["eclaw", "session", "start"]

@@ -1,33 +1,37 @@
-"""Daemon server — Unix socket IPC + orchestrator lifecycle."""
+"""Daemon server — Unix socket IPC + orchestrator lifecycle + health monitoring."""
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 from pathlib import Path
 
 import orjson
 
 from e_clawhisper.daemon.orchestrator import Orchestrator
+from e_clawhisper.health import HealthChecker, check_services
 from e_clawhisper.shared.logger import configure_logging, logger
-from e_clawhisper.shared.settings import AppConfig, load_config, settings
+from e_clawhisper.shared.operational.exceptions import HealthCheckError
+from e_clawhisper.shared.settings import AppConfig, settings
 
 
 class DaemonServer:
-    """Runs orchestrator + IPC socket for CLI control."""
+    """Runs orchestrator + IPC socket + health monitor."""
 
-    __slots__ = ("_config", "_orchestrator", "_socket_path", "_running")
+    __slots__ = ("_config", "_orchestrator", "_health", "_socket_path", "_running")
 
     def __init__(self, config: AppConfig | None = None) -> None:
-        self._config = config or load_config()
+        self._config = config or AppConfig.load()
         self._orchestrator = Orchestrator(self._config)
+        self._health = HealthChecker(self._config)
         self._socket_path = settings.SOCKET_PATH
         self._running = False
 
     ##### LIFECYCLE #####
 
     async def run(self) -> None:
-        """Start IPC server and orchestrator concurrently."""
+        """Start IPC server, orchestrator, and health monitor concurrently."""
         configure_logging(
             settings.LOG_LEVEL,
             idle_interval=self._config.logging.idle_interval,
@@ -38,6 +42,16 @@ class DaemonServer:
             "START",
             f"daemon starting agent={self._config.agent.name} socket={self._socket_path}",
         )
+
+        # Pre-flight health check
+        result = await check_services(self._config)
+        for svc in result.services:
+            status = "OK" if svc.healthy else "FAIL"
+            logger.system("HEALTH", f"{status} {svc.name} {svc.detail}")
+        if not result.healthy:
+            logger.error(f"startup_health_check_failed\n{result}")
+            msg = f"Required services unreachable:\n{result}"
+            raise HealthCheckError(msg)
 
         self._running = True
         self._cleanup_socket()
@@ -50,21 +64,30 @@ class DaemonServer:
             async with ipc_server:
                 pipeline_task = asyncio.create_task(self._orchestrator.start())
                 ipc_task = asyncio.create_task(ipc_server.serve_forever())
+                health_task = asyncio.create_task(self._health.run(self._shutdown))
 
                 done, pending = await asyncio.wait(
-                    [pipeline_task, ipc_task],
+                    [pipeline_task, ipc_task, health_task],
                     return_when=asyncio.FIRST_COMPLETED,
                 )
 
                 for task in pending:
                     task.cancel()
                 for task in done:
-                    if exc := task.exception():
-                        logger.error(f"daemon_error: {exc}")
+                    with contextlib.suppress(asyncio.CancelledError, HealthCheckError):
+                        if exc := task.exception():
+                            logger.error(f"daemon_error: {exc}")
         finally:
+            self._health.stop()
             await self._orchestrator.stop()
             self._cleanup_socket()
             logger.system("STOP", "daemon stopped")
+
+    ##### SHUTDOWN #####
+
+    async def _shutdown(self) -> None:
+        self._running = False
+        await self._orchestrator.stop()
 
     ##### IPC #####
 
@@ -77,6 +100,12 @@ class DaemonServer:
             match request.get("command", ""):
                 case "status":
                     response = self._build_status()
+                case "health":
+                    result = await check_services(self._config)
+                    response = {
+                        "status": "ok" if result.healthy else "degraded",
+                        "data": {s.name: {"healthy": s.healthy, "detail": s.detail} for s in result.services},
+                    }
                 case "stop":
                     self._running = False
                     await self._orchestrator.stop()

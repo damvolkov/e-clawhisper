@@ -31,7 +31,7 @@ class WhisperliveAdapter:
     )
 
     def __init__(self, config: WhisperLiveConfig) -> None:
-        self._ws_url = f"ws://{config.host}:{config.port}"
+        self._ws_url = str(config.url)
         self._model = config.model
         self._language = config.language
         self._finish_timeout = config.finish_timeout

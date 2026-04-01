@@ -17,7 +17,7 @@ class KokoroAdapter:
     __slots__ = ("_base_url", "_model", "_voice", "_sample_rate", "_response_format", "_timeout", "_stopped")
 
     def __init__(self, config: KokoroConfig) -> None:
-        self._base_url = f"http://{config.host}:{config.port}"
+        self._base_url = str(config.url).rstrip("/")
         self._model = config.model
         self._voice = config.voice
         self._sample_rate = config.sample_rate

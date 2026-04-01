@@ -14,7 +14,7 @@ import pytest
 from e_clawhisper.daemon.adapters.tts.piper import PiperAdapter
 from e_clawhisper.shared.settings import PiperConfig
 
-_CONFIG = PiperConfig(host="localhost", port=10200, sample_rate=22050)
+_CONFIG = PiperConfig(url="tcp://localhost:10200", sample_rate=22050)
 _SAMPLE_RATE = 22050
 
 

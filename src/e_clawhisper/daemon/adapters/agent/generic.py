@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator, Sequence
 
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models import Model
+from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from e_clawhisper.daemon.adapters.agent.base import AgentAdapter
@@ -22,17 +25,40 @@ _PROVIDER_MODELS: dict[LLMProvider, str] = {
     LLMProvider.ANTHROPIC: "anthropic:claude-sonnet-4-20250514",
 }
 
+# Env var name per provider — PydanticAI reads these automatically
+_API_KEY_ENV: dict[LLMProvider, str] = {
+    LLMProvider.GEMINI: "GOOGLE_API_KEY",
+    LLMProvider.OPENAI: "OPENAI_API_KEY",
+    LLMProvider.ANTHROPIC: "ANTHROPIC_API_KEY",
+}
+
+
+def _resolve_api_key(config: GenericLLMConfig) -> str:
+    """Resolve API key: config → env var → empty."""
+    if config.api_key:
+        return config.api_key
+    env_name = _API_KEY_ENV.get(config.provider, "")
+    return os.environ.get(env_name, "") if env_name else ""
+
 
 def _build_model(config: GenericLLMConfig) -> Model | str:
-    """Build PydanticAI model from config — vLLM uses custom OpenAI provider."""
+    """Build PydanticAI model from config."""
+    api_key = _resolve_api_key(config)
     match config.provider:
         case LLMProvider.VLLM:
             provider = OpenAIProvider(
-                base_url=f"http://{config.host}:{config.port}/v1",
-                api_key=config.api_key or "no-key",
+                base_url=f"{str(config.url).rstrip('/')}/v1",
+                api_key=api_key or "no-key",
             )
             return OpenAIChatModel(config.model, provider=provider)
-        case LLMProvider.GEMINI | LLMProvider.OPENAI | LLMProvider.ANTHROPIC:
+        case LLMProvider.GEMINI:
+            model_name = config.model if config.model != "default" else _PROVIDER_MODELS[LLMProvider.GEMINI]
+            provider = GoogleProvider(api_key=api_key or None)
+            return GoogleModel(model_name, provider=provider)
+        case LLMProvider.OPENAI | LLMProvider.ANTHROPIC:
+            if api_key:
+                env_name = _API_KEY_ENV[config.provider]
+                os.environ.setdefault(env_name, api_key)
             return config.model if config.model != "default" else _PROVIDER_MODELS[config.provider]
         case _:
             msg = f"Unsupported LLM provider: {config.provider}"

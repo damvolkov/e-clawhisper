@@ -16,8 +16,8 @@ from e_clawhisper.daemon.adapters.stt.whisperlive import WhisperliveAdapter
 from e_clawhisper.daemon.adapters.tts.piper import PiperAdapter
 from e_clawhisper.shared.settings import PiperConfig, WhisperLiveConfig
 
-_STT_CONFIG = WhisperLiveConfig(host="localhost", port=9090, model="small", language="es")
-_TTS_CONFIG = PiperConfig(host="localhost", port=10200, sample_rate=22050)
+_STT_CONFIG = WhisperLiveConfig(url="ws://localhost:9090", model="small", language="es")
+_TTS_CONFIG = PiperConfig(url="tcp://localhost:10200", sample_rate=22050)
 _STT_SAMPLE_RATE = 16000
 _TTS_SAMPLE_RATE = 22050
 

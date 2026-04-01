@@ -1,0 +1,94 @@
+# e-clawhisper configuration
+# Edit this file and restart: sudo systemctl restart e-clawhisper
+# Docs: https://github.com/eager-dev/e-clawhisper
+
+language: en                       # en | es | fr | de | it | pt — cascades to STT + TTS voice
+turn_timeout: 300.0                # Max seconds per conversation turn
+
+agent:
+  name: assistant                  # Display name (OpenFang agent name)
+  backend: generic                 # openfang | generic
+
+##### SENTINEL — passive listening #####
+
+sentinel:
+  energy_floor: 0.01               # RMS below this → SILENCE (skips VAD)
+  vad_threshold: 0.5               # Silero speech probability threshold
+  cooldown: 1.5                    # Seconds to wait after TURN before re-arming wakeword
+  wakeword:
+    model: alexa                   # OWW model name (alexa, eager, maia, etc.)
+    threshold: 0.5                 # Wakeword confidence threshold
+
+##### VAD — end-of-speech detection (TURN pipeline) #####
+
+vad:
+  threshold: 0.5                   # Speech probability threshold
+  silence_duration: 1.5            # Seconds of silence to trigger end-of-speech
+  min_recording_time: 1.0          # Minimum recording before end-of-speech is allowed
+
+##### CONVERSATION — multi-turn loop #####
+
+conversation:
+  enabled: true                    # Enable LOOP phase (continue after TURN without wakeword)
+  loop_timeout: 2.0                # Seconds to wait for follow-up speech in LOOP
+  max_turns: 10                    # Max consecutive turns before returning to SENTINEL
+
+##### BACKENDS — external service connections #####
+
+backends:
+  openfang:
+    url: http://127.0.0.1:4200     # OpenFang server URL
+    timeout: 30.0                  # Request timeout (seconds)
+
+  generic:
+    provider: gemini               # gemini | openai | anthropic | vllm
+    model: gemini-2.0-flash        # Model identifier for the chosen provider
+    api_key: ""                    # API key (or set GEMINI_API_KEY / OPENAI_API_KEY env var)
+    timeout: 60.0                  # LLM request timeout (seconds)
+    system_prompt: "You are a helpful voice assistant. Keep responses concise and conversational."
+    url: http://localhost:45100    # Only used for vllm provider
+
+##### STT — speech-to-text #####
+
+stt:
+  backend: whisperlive             # whisperlive (only option for now)
+  whisperlive:
+    url: ws://localhost:45120      # WhisperLive WebSocket URL
+    model: large-v3-turbo          # Whisper model variant
+    language: en                   # Overridden by top-level language if different
+    finish_timeout: 5.0            # Seconds to wait for final transcript after end-of-speech
+
+##### TTS — text-to-speech #####
+
+tts:
+  backend: kokoro                  # kokoro | piper
+
+  kokoro:
+    url: http://localhost:45130    # Kokoro HTTP streaming URL
+    model: kokoro                  # Model name
+    voice: em_alex                 # Voice ID
+    sample_rate: 24000             # Audio sample rate (Hz)
+    response_format: pcm           # pcm | wav | mp3 | opus | flac
+    timeout: 30.0                  # HTTP request timeout (seconds)
+
+  piper:
+    url: tcp://localhost:45130     # Piper Wyoming TCP URL
+    voice: en_US-lessac-medium     # Piper voice (auto-selected by language if default)
+    sample_rate: 22050             # Audio sample rate (Hz)
+    disconnect_timeout: 0.5        # Seconds to wait on disconnect
+
+##### AUDIO — microphone and speaker #####
+
+audio:
+  sample_rate: 16000               # Mic capture rate (Hz) — must be 16000 for Silero VAD
+  channels: 1                      # Mono only
+  chunk_size: 512                  # Samples per chunk — must be 512 for Silero VAD
+  queue_size: 100                  # Mic → pipeline async queue depth
+  pcm_queue_size: 20               # TTS → speaker async queue depth
+  playback_latency: high           # low | medium | high — sounddevice latency
+
+##### LOGGING #####
+
+logging:
+  idle_interval: 0.25              # Seconds between SENTINEL log lines
+  turn_interval: 0.25              # Seconds between TURN log lines
