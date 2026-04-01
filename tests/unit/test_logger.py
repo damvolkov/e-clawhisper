@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from e_clawhisper.shared.logger import PipelineLogger, PipelineRenderer
-
+from e_heed.shared.logger import PipelineLogger, PipelineRenderer
 
 ##### RENDERER #####
 

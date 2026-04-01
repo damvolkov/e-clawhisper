@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from e_clawhisper.shared.settings import AppConfig
+from e_heed.shared.settings import AppConfig
 
 
 @pytest.fixture

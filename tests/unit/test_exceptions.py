@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from e_clawhisper.shared.operational.exceptions import (
+from e_heed.shared.operational.exceptions import (
     AdapterError,
     AppError,
     ConfigError,

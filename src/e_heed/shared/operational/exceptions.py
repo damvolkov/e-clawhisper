@@ -1,0 +1,27 @@
+"""Exception hierarchy for e-heed."""
+
+from __future__ import annotations
+
+
+class AppError(Exception):
+    """Base for all project exceptions."""
+
+
+class AdapterError(AppError):
+    """External service communication failure."""
+
+
+class PipelineError(AppError):
+    """Pipeline processing failure."""
+
+
+class ModelNotFoundError(AppError):
+    """ML model file not found."""
+
+
+class ConfigError(AppError):
+    """Invalid or missing configuration."""
+
+
+class HealthCheckError(AppError):
+    """Service health check failed."""

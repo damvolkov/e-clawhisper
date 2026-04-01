@@ -1,0 +1,12 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(35, 35)">
+    <!-- E letterform -->
+    <rect x="0" y="0" width="14" height="130" fill="#1a6e8a"/>
+    <rect x="14" y="0" width="62" height="14" fill="#1a6e8a"/>
+    <rect x="14" y="58" width="38" height="14" fill="#1a6e8a"/>
+    <rect x="14" y="116" width="62" height="14" fill="#1a6e8a"/>
+    <!-- Core symbol: concentric diamonds emerging from E -->
+    <polygon points="90,45 110,65 90,85 70,65" fill="none" stroke="#2196f3" stroke-width="4.5" stroke-linejoin="round"/>
+    <polygon points="90,57 98,65 90,73 82,65" fill="#2196f3"/>
+  </g>
+</svg>

@@ -8,7 +8,7 @@ from tempfile import NamedTemporaryFile
 import pytest
 from pydantic import ValidationError
 
-from e_clawhisper.shared.settings import (
+from e_heed.shared.settings import (
     AgentBackend,
     AppConfig,
     AudioConfig,
@@ -19,8 +19,8 @@ from e_clawhisper.shared.settings import (
     LoggingConfig,
     OpenFangConfig,
     PiperConfig,
-    STTBackend,
     Settings,
+    STTBackend,
     TTSBackend,
     VADConfig,
     WhisperLiveConfig,
@@ -52,7 +52,7 @@ def test_enum_values(enum_cls: type, member: object, value: str) -> None:
 def test_settings_defaults() -> None:
     s = Settings(_env_file=None)
     assert s.ENVIRONMENT == "DEV"
-    assert s.SOCKET_PATH == "/tmp/e-claw.sock"
+    assert s.SOCKET_PATH == "/tmp/eheed.sock"
     assert s.is_dev is True
 
 
@@ -65,7 +65,7 @@ def test_settings_path_defaults_resolve() -> None:
 
 def test_settings_path_env_override() -> None:
     s = Settings(_env_file=None, CONFIG_PATH=Path("/etc/test/config.yaml"))
-    assert s.CONFIG_PATH == Path("/etc/test/config.yaml")
+    assert Path("/etc/test/config.yaml") == s.CONFIG_PATH
 
 
 ##### APPCONFIG DEFAULTS #####
@@ -75,8 +75,8 @@ def test_app_config_defaults() -> None:
     cfg = AppConfig()
     assert cfg.agent.name == "damien"
     assert cfg.agent.backend == AgentBackend.OPENFANG
-    assert cfg.stt.backend == STTBackend.WHISPERLIVE
-    assert cfg.tts.backend == TTSBackend.KOKORO
+    assert cfg.stt.backend == STTBackend.EVOICE
+    assert cfg.tts.backend == TTSBackend.EVOICE
     assert cfg.vad.threshold == 0.5
     assert cfg.vad.min_recording_time == 1.0
     assert cfg.audio.sample_rate == 16000
@@ -269,7 +269,7 @@ sentinel:
 
     assert cfg.agent.name == "testbot"
     assert "10.0.0.1:9999" in str(cfg.stt.whisperlive.url)
-    assert cfg.tts.backend == TTSBackend.KOKORO
+    assert cfg.tts.backend == TTSBackend.EVOICE
     assert cfg.sentinel.energy_floor == 0.02
     assert cfg.sentinel.wakeword.model == "hey_jarvis"
     assert cfg.sentinel.wakeword.threshold == 0.7

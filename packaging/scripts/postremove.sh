@@ -13,5 +13,5 @@ if [ -n "$REAL_UID" ] && [ -S "/run/user/$REAL_UID/bus" ]; then
         systemctl --user daemon-reload 2>/dev/null || true
 fi
 
-# Note: ~/.config/e-clawhisper/ is preserved (user config).
-# /opt/e-clawhisper/ is removed by the package manager.
+# Note: ~/.config/e-heed/ is preserved (user config).
+# /opt/e-heed/ is removed by the package manager.

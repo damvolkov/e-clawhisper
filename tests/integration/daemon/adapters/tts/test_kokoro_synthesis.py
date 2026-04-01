@@ -10,8 +10,8 @@ import httpx
 import numpy as np
 import pytest
 
-from e_clawhisper.daemon.adapters.tts.kokoro import KokoroAdapter
-from e_clawhisper.shared.settings import KokoroConfig
+from e_heed.daemon.adapters.tts.kokoro import KokoroAdapter
+from e_heed.shared.settings import KokoroConfig
 
 _CONFIG = KokoroConfig(url="http://localhost:45130", voice="em_alex", sample_rate=24000)
 _SAMPLE_RATE = 24000

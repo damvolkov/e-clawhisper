@@ -7,9 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from e_clawhisper.daemon.sentinel.pipeline import SentinelPipeline
-from e_clawhisper.shared.settings import SentinelConfig
-
+from e_heed.daemon.sentinel.pipeline import SentinelPipeline
+from e_heed.shared.settings import SentinelConfig
 
 ##### FIXTURES #####
 
@@ -47,8 +46,8 @@ class _StubWW:
         pass
 
 
-@patch("e_clawhisper.daemon.sentinel.pipeline.WakeWordDetector")
-@patch("e_clawhisper.daemon.sentinel.pipeline.SileroVAD")
+@patch("e_heed.daemon.sentinel.pipeline.WakeWordDetector")
+@patch("e_heed.daemon.sentinel.pipeline.SileroVAD")
 def _make_pipeline(
     mock_vad_cls: MagicMock,
     mock_ww_cls: MagicMock,

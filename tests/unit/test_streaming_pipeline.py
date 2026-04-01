@@ -7,10 +7,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from e_clawhisper.daemon.adapters.audio import AudioAdapter
-from e_clawhisper.daemon.adapters.base import AgentPort, STTPort, TTSPort
-from e_clawhisper.daemon.turn.pipeline import TurnPipeline
-from e_clawhisper.shared.settings import VADConfig
+from e_heed.daemon.adapters.audio import AudioAdapter
+from e_heed.daemon.adapters.base import AgentPort, STTPort, TTSPort
+from e_heed.daemon.turn.pipeline import TurnPipeline
+from e_heed.shared.settings import VADConfig
 
 _VAD_CFG = VADConfig(threshold=0.5, silence_duration=1.5, min_recording_time=1.0)
 _PCM_CHUNK = b"\x00\x01" * 100

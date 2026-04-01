@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from e_clawhisper.daemon.adapters.tts.piper import PiperAdapter
-from e_clawhisper.shared.settings import PiperConfig
-
+from e_heed.daemon.adapters.tts.piper import PiperAdapter
+from e_heed.shared.settings import PiperConfig
 
 ##### INIT #####
 
@@ -44,7 +43,7 @@ async def test_stop_sets_flag() -> None:
 ##### SYNTHESIZE #####
 
 
-@patch("e_clawhisper.daemon.adapters.tts.piper.AsyncTcpClient")
+@patch("e_heed.daemon.adapters.tts.piper.AsyncTcpClient")
 async def test_synthesize_yields_audio_chunks(mock_client_cls: MagicMock) -> None:
     mock_client = AsyncMock()
     mock_client_cls.return_value = mock_client
@@ -58,8 +57,8 @@ async def test_synthesize_yields_audio_chunks(mock_client_cls: MagicMock) -> Non
     mock_client.read_event = AsyncMock(side_effect=[audio_event, stop_event])
 
     with (
-        patch("e_clawhisper.daemon.adapters.tts.piper.AudioChunk") as mock_ac,
-        patch("e_clawhisper.daemon.adapters.tts.piper.AudioStop") as mock_as,
+        patch("e_heed.daemon.adapters.tts.piper.AudioChunk") as mock_ac,
+        patch("e_heed.daemon.adapters.tts.piper.AudioStop") as mock_as,
     ):
         mock_ac.is_type.side_effect = lambda t: t == "audio-chunk"
         mock_as.is_type.side_effect = lambda t: t == "audio-stop"
@@ -76,7 +75,7 @@ async def test_synthesize_yields_audio_chunks(mock_client_cls: MagicMock) -> Non
     mock_client.write_event.assert_called_once()
 
 
-@patch("e_clawhisper.daemon.adapters.tts.piper.AsyncTcpClient")
+@patch("e_heed.daemon.adapters.tts.piper.AsyncTcpClient")
 async def test_synthesize_stops_on_none_event(mock_client_cls: MagicMock) -> None:
     mock_client = AsyncMock()
     mock_client_cls.return_value = mock_client
@@ -87,7 +86,7 @@ async def test_synthesize_stops_on_none_event(mock_client_cls: MagicMock) -> Non
     assert chunks == []
 
 
-@patch("e_clawhisper.daemon.adapters.tts.piper.AsyncTcpClient")
+@patch("e_heed.daemon.adapters.tts.piper.AsyncTcpClient")
 async def test_synthesize_respects_stop_flag(mock_client_cls: MagicMock) -> None:
     mock_client = AsyncMock()
     mock_client_cls.return_value = mock_client
@@ -105,8 +104,8 @@ async def test_synthesize_respects_stop_flag(mock_client_cls: MagicMock) -> None
     mock_client.read_event = AsyncMock(side_effect=lambda: _set_stopped())
 
     with (
-        patch("e_clawhisper.daemon.adapters.tts.piper.AudioChunk") as mock_ac,
-        patch("e_clawhisper.daemon.adapters.tts.piper.AudioStop") as mock_as,
+        patch("e_heed.daemon.adapters.tts.piper.AudioChunk") as mock_ac,
+        patch("e_heed.daemon.adapters.tts.piper.AudioStop") as mock_as,
     ):
         mock_ac.is_type.return_value = False
         mock_as.is_type.return_value = False

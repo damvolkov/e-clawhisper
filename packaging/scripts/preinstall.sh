@@ -2,4 +2,4 @@
 # Pre-install: create config directory.
 set -euo pipefail
 
-mkdir -p /etc/e-clawhisper
+mkdir -p /etc/e-heed

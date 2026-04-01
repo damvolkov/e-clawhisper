@@ -7,12 +7,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import numpy as np
 
-from e_clawhisper.daemon.adapters.audio import AudioAdapter
-from e_clawhisper.daemon.adapters.base import AgentPort, STTPort, TTSPort
-from e_clawhisper.daemon.turn.pipeline import TurnPipeline
-from e_clawhisper.daemon.turn.vad import EndOfSpeechResult
-from e_clawhisper.shared.operational.events import TurnComplete, TurnError
-from e_clawhisper.shared.settings import VADConfig
+from e_heed.daemon.adapters.audio import AudioAdapter
+from e_heed.daemon.adapters.base import AgentPort, STTPort, TTSPort
+from e_heed.daemon.turn.pipeline import TurnPipeline
+from e_heed.daemon.turn.vad import EndOfSpeechResult
+from e_heed.shared.operational.events import TurnComplete, TurnError
+from e_heed.shared.settings import VADConfig
 
 _VAD_CFG = VADConfig(threshold=0.5, silence_duration=1.5, min_recording_time=1.0)
 _PCM_CHUNK = b"\x00\x01" * 100
@@ -70,7 +70,7 @@ def _make_audio_with_vad_stop() -> AudioAdapter:
 ##### EMPTY TRANSCRIPT #####
 
 
-@patch("e_clawhisper.daemon.turn.pipeline.EndOfSpeechDetector")
+@patch("e_heed.daemon.turn.pipeline.EndOfSpeechDetector")
 async def test_run_empty_transcript_returns_error(mock_vad_cls: MagicMock) -> None:
     mock_vad = MagicMock()
     mock_vad.process.return_value = EndOfSpeechResult(is_speech=False, should_stop=True, probability=0.1)
@@ -90,7 +90,7 @@ async def test_run_empty_transcript_returns_error(mock_vad_cls: MagicMock) -> No
 ##### SUCCESSFUL TURN #####
 
 
-@patch("e_clawhisper.daemon.turn.pipeline.EndOfSpeechDetector")
+@patch("e_heed.daemon.turn.pipeline.EndOfSpeechDetector")
 async def test_run_successful_turn(mock_vad_cls: MagicMock) -> None:
     mock_vad = MagicMock()
     mock_vad.process.return_value = EndOfSpeechResult(is_speech=True, should_stop=True, probability=0.9)
@@ -111,7 +111,7 @@ async def test_run_successful_turn(mock_vad_cls: MagicMock) -> None:
 ##### EMPTY RESPONSE #####
 
 
-@patch("e_clawhisper.daemon.turn.pipeline.EndOfSpeechDetector")
+@patch("e_heed.daemon.turn.pipeline.EndOfSpeechDetector")
 async def test_run_empty_response_returns_error(mock_vad_cls: MagicMock) -> None:
     mock_vad = MagicMock()
     mock_vad.process.return_value = EndOfSpeechResult(is_speech=True, should_stop=True, probability=0.9)
@@ -131,7 +131,7 @@ async def test_run_empty_response_returns_error(mock_vad_cls: MagicMock) -> None
 ##### EXCEPTION DURING RUN #####
 
 
-@patch("e_clawhisper.daemon.turn.pipeline.EndOfSpeechDetector")
+@patch("e_heed.daemon.turn.pipeline.EndOfSpeechDetector")
 async def test_run_catches_exception_as_turn_error(mock_vad_cls: MagicMock) -> None:
     mock_vad = MagicMock()
     mock_vad.process.side_effect = RuntimeError("vad boom")

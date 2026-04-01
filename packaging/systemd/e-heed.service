@@ -1,0 +1,32 @@
+[Unit]
+Description=e-heed voice daemon
+Documentation=https://github.com/eager-dev/e-heed
+After=sound.target pipewire.service pipewire-pulse.service
+Wants=pipewire.service
+
+[Service]
+Type=simple
+
+EnvironmentFile=-%h/.config/e-heed/.env
+EnvironmentFile=-/etc/e-heed/.env
+Environment=MODELS_DIR=/opt/e-heed/models
+Environment=DATA_DIR=/opt/e-heed/data
+Environment=SOCKET_PATH=%t/e-heed/eheed.sock
+Environment=PYTHONPATH=/opt/e-heed/src
+
+ExecStartPre=/bin/mkdir -p %t/e-heed
+ExecStart=/opt/e-heed/.venv/bin/python -m e_heed.main run
+ExecStop=/usr/bin/eheed session stop
+
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+PrivateTmp=yes
+ReadWritePaths=%t/e-heed
+
+[Install]
+WantedBy=default.target

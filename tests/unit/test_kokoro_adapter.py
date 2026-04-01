@@ -4,11 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
-
-from e_clawhisper.daemon.adapters.tts.kokoro import KokoroAdapter
-from e_clawhisper.shared.settings import KokoroConfig
-
+from e_heed.daemon.adapters.tts.kokoro import KokoroAdapter
+from e_heed.shared.settings import KokoroConfig
 
 ##### INIT #####
 
@@ -56,7 +53,7 @@ def test_default_config() -> None:
 ##### SYNTHESIZE #####
 
 
-@patch("e_clawhisper.daemon.adapters.tts.kokoro.httpx.AsyncClient")
+@patch("e_heed.daemon.adapters.tts.kokoro.httpx.AsyncClient")
 async def test_synthesize_yields_chunks(mock_client_cls: MagicMock) -> None:
     mock_response = AsyncMock()
     mock_response.raise_for_status = MagicMock()
@@ -82,7 +79,7 @@ async def test_synthesize_yields_chunks(mock_client_cls: MagicMock) -> None:
     assert chunks[1] == b"\x01" * 512
 
 
-@patch("e_clawhisper.daemon.adapters.tts.kokoro.httpx.AsyncClient")
+@patch("e_heed.daemon.adapters.tts.kokoro.httpx.AsyncClient")
 async def test_synthesize_stops_on_flag(mock_client_cls: MagicMock) -> None:
     mock_response = AsyncMock()
     mock_response.raise_for_status = MagicMock()

@@ -11,8 +11,8 @@ import asyncio
 import numpy as np
 import pytest
 
-from e_clawhisper.daemon.adapters.tts.piper import PiperAdapter
-from e_clawhisper.shared.settings import PiperConfig
+from e_heed.daemon.adapters.tts.piper import PiperAdapter
+from e_heed.shared.settings import PiperConfig
 
 _CONFIG = PiperConfig(url="tcp://localhost:10200", sample_rate=22050)
 _SAMPLE_RATE = 22050

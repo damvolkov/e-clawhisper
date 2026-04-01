@@ -1,7 +1,7 @@
-# nfpm configuration — builds .deb package for e-clawhisper
+# nfpm configuration — builds .deb package for e-heed
 # https://nfpm.goreleaser.com/configuration/
 
-name: e-clawhisper
+name: e-heed
 arch: "${ARCH}"
 platform: linux
 version: "${VERSION}"
@@ -9,7 +9,7 @@ release: "1"
 maintainer: "Eager <dev@eager.dev>"
 description: "Always-on voice daemon: wake-word → STT → Agent → TTS"
 vendor: "Eager"
-homepage: "https://github.com/eager-dev/e-clawhisper"
+homepage: "https://github.com/eager-dev/e-heed"
 license: "MIT"
 section: sound
 priority: optional
@@ -26,42 +26,42 @@ recommends:
 contents:
   # Application — venv (self-contained Python + all deps)
   - src: ../dist/.staging/.venv/
-    dst: /opt/e-clawhisper/.venv/
+    dst: /opt/e-heed/.venv/
     type: tree
 
   # Application — source code
-  - src: ../src/e_clawhisper/
-    dst: /opt/e-clawhisper/src/e_clawhisper/
+  - src: ../src/e_heed/
+    dst: /opt/e-heed/src/e_heed/
     type: tree
 
   # Models — ONNX (VAD + wakeword)
   - src: ../models/
-    dst: /opt/e-clawhisper/models/
+    dst: /opt/e-heed/models/
     type: tree
 
   # Infrastructure — compose file for STT/TTS services
   - src: ../compose.infra.yml
-    dst: /opt/e-clawhisper/compose.infra.yml
+    dst: /opt/e-heed/compose.infra.yml
 
   # CLI wrapper
-  - src: ./bin/eclaw
-    dst: /usr/bin/eclaw
+  - src: ./bin/eheed
+    dst: /usr/bin/eheed
     file_info:
       mode: 0755
 
   # Configuration (survives upgrades)
   - src: ./config.yaml
-    dst: /etc/e-clawhisper/config.yaml
+    dst: /etc/e-heed/config.yaml
     type: config|noreplace
 
   # Default environment file
   - src: ./env.default
-    dst: /etc/e-clawhisper/.env
+    dst: /etc/e-heed/.env
     type: config|noreplace
 
   # Systemd user service (global user unit — available to all users)
-  - src: ./systemd/e-clawhisper.service
-    dst: /usr/lib/systemd/user/e-clawhisper.service
+  - src: ./systemd/e-heed.service
+    dst: /usr/lib/systemd/user/e-heed.service
 
 scripts:
   preinstall: ./scripts/preinstall.sh

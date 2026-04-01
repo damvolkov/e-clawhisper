@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from e_clawhisper.daemon.adapters.agent.openfang import OpenfangAdapter
-from e_clawhisper.shared.settings import OpenFangConfig
-
+from e_heed.daemon.adapters.agent.openfang import OpenfangAdapter
+from e_heed.shared.settings import OpenFangConfig
 
 ##### INIT #####
 
@@ -118,8 +117,9 @@ async def test_disconnect_cancels_recv_task_and_clears_ws() -> None:
 
 
 async def test_disconnect_suppresses_connection_closed_on_ws_close() -> None:
-    import websockets.exceptions
     from unittest.mock import AsyncMock, MagicMock, patch
+
+    import websockets.exceptions
 
     mock_ws = MagicMock()
     mock_ws.recv = AsyncMock(return_value=b'{"type":"connected"}')
@@ -139,7 +139,6 @@ async def test_disconnect_suppresses_connection_closed_on_ws_close() -> None:
 
 
 async def test_receive_loop_routes_response_types_to_queue() -> None:
-    import asyncio
     from unittest.mock import MagicMock
 
     import orjson
@@ -199,8 +198,9 @@ async def test_receive_loop_ignores_known_control_types() -> None:
 
 
 async def test_receive_loop_handles_connection_closed() -> None:
-    import websockets.exceptions
     from unittest.mock import MagicMock
+
+    import websockets.exceptions
 
     adapter = OpenfangAdapter(OpenFangConfig())
 
@@ -260,7 +260,6 @@ async def test_send_raises_when_not_connected() -> None:
 
 
 async def test_send_yields_text_delta_chunks() -> None:
-    import asyncio
     from unittest.mock import AsyncMock, MagicMock
 
     adapter = OpenfangAdapter(OpenFangConfig(timeout=5.0))
@@ -322,8 +321,7 @@ async def test_send_skips_response_final_when_deltas_already_yielded() -> None:
 
 
 async def test_send_breaks_on_timeout() -> None:
-    import asyncio
-    from unittest.mock import AsyncMock, MagicMock, patch
+    from unittest.mock import AsyncMock, MagicMock
 
     adapter = OpenfangAdapter(OpenFangConfig(timeout=0.01))
     mock_ws = MagicMock()
@@ -409,10 +407,12 @@ async def test_resolve_agent_id_finds_agent_by_name() -> None:
 
     mock_resp = MagicMock()
     mock_resp.raise_for_status = MagicMock()
-    mock_resp.json = MagicMock(return_value=[
-        {"id": "uuid-001", "name": "Jarvis"},
-        {"id": "uuid-002", "name": "Ada"},
-    ])
+    mock_resp.json = MagicMock(
+        return_value=[
+            {"id": "uuid-001", "name": "Jarvis"},
+            {"id": "uuid-002", "name": "Ada"},
+        ]
+    )
 
     mock_client = AsyncMock()
     mock_client.get = AsyncMock(return_value=mock_resp)
@@ -446,8 +446,9 @@ async def test_resolve_agent_id_case_insensitive() -> None:
 
 
 async def test_resolve_agent_id_raises_when_not_found() -> None:
-    import pytest
     from unittest.mock import AsyncMock, MagicMock, patch
+
+    import pytest
 
     mock_resp = MagicMock()
     mock_resp.raise_for_status = MagicMock()

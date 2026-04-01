@@ -8,17 +8,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import orjson
 import pytest
 
-from e_clawhisper.daemon.server import DaemonServer
-from e_clawhisper.health import HealthResult, ServiceStatus
-from e_clawhisper.shared.operational.exceptions import HealthCheckError
-from e_clawhisper.shared.settings import AppConfig
-
+from e_heed.daemon.server import DaemonServer
+from e_heed.health import HealthResult, ServiceStatus
+from e_heed.shared.operational.exceptions import HealthCheckError
+from e_heed.shared.settings import AppConfig
 
 ##### FIXTURES #####
 
 
-@patch("e_clawhisper.daemon.server.Orchestrator")
-@patch("e_clawhisper.daemon.server.HealthChecker")
+@patch("e_heed.daemon.server.Orchestrator")
+@patch("e_heed.daemon.server.HealthChecker")
 def _make_server(mock_health: MagicMock, mock_orch: MagicMock, config: AppConfig | None = None) -> DaemonServer:
     cfg = config or AppConfig()
     server = DaemonServer(cfg)
@@ -138,7 +137,7 @@ async def test_handle_ipc_health() -> None:
     reader.read.return_value = orjson.dumps({"command": "health"})
     writer = _make_writer()
 
-    with patch("e_clawhisper.daemon.server.check_services") as mock_check:
+    with patch("e_heed.daemon.server.check_services") as mock_check:
         mock_result = MagicMock()
         mock_result.healthy = True
         mock_result.services = []
@@ -164,8 +163,8 @@ async def test_shutdown_stops_orchestrator() -> None:
 ##### RUN — HEALTH CHECK FAILURE #####
 
 
-@patch("e_clawhisper.daemon.server.configure_logging")
-@patch("e_clawhisper.daemon.server.check_services")
+@patch("e_heed.daemon.server.configure_logging")
+@patch("e_heed.daemon.server.check_services")
 async def test_run_raises_on_unhealthy_services(mock_check: AsyncMock, mock_log: MagicMock) -> None:
     server = _make_server()
     mock_check.return_value = HealthResult(

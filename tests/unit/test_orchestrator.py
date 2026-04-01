@@ -2,25 +2,25 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from e_clawhisper.daemon.adapters.agent.generic import GenericAdapter
-from e_clawhisper.daemon.adapters.agent.openfang import OpenfangAdapter
-from e_clawhisper.daemon.adapters.stt.whisperlive import WhisperliveAdapter
-from e_clawhisper.daemon.adapters.tts.kokoro import KokoroAdapter
-from e_clawhisper.daemon.adapters.tts.piper import PiperAdapter
-from e_clawhisper.daemon.orchestrator import Orchestrator, PipelinePhase
-from e_clawhisper.shared.operational.events import TurnComplete, TurnError
-from e_clawhisper.shared.settings import AgentBackend, AppConfig, STTBackend, TTSBackend
-
+from e_heed.daemon.adapters.agent.generic import GenericAdapter
+from e_heed.daemon.adapters.agent.openfang import OpenfangAdapter
+from e_heed.daemon.adapters.stt.evoice import EVoiceSTTAdapter
+from e_heed.daemon.adapters.stt.whisperlive import WhisperliveAdapter
+from e_heed.daemon.adapters.tts.kokoro import KokoroAdapter
+from e_heed.daemon.adapters.tts.piper import PiperAdapter
+from e_heed.daemon.orchestrator import Orchestrator, PipelinePhase
+from e_heed.shared.operational.events import TurnComplete, TurnError
+from e_heed.shared.settings import AgentBackend, AppConfig, STTBackend, TTSBackend
 
 ##### HELPERS #####
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 def _make_orchestrator(
     mock_turn: MagicMock,
     mock_sentinel: MagicMock,
@@ -43,8 +43,8 @@ def test_phase_enum_values() -> None:
 ##### INIT & FACTORIES #####
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 def test_init_default_creates_openfang(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     cfg = AppConfig()
     cfg.agent.backend = AgentBackend.OPENFANG
@@ -52,8 +52,8 @@ def test_init_default_creates_openfang(mock_turn: MagicMock, mock_sentinel: Magi
     assert isinstance(orch._agent, OpenfangAdapter)
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 def test_init_generic_creates_generic(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     cfg = AppConfig()
     cfg.agent.backend = AgentBackend.GENERIC
@@ -61,15 +61,24 @@ def test_init_generic_creates_generic(mock_turn: MagicMock, mock_sentinel: Magic
     assert isinstance(orch._agent, GenericAdapter)
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
-def test_init_stt_whisperlive(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
+def test_init_stt_evoice_default(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     orch = Orchestrator(AppConfig())
+    assert isinstance(orch._stt, EVoiceSTTAdapter)
+
+
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
+def test_init_stt_whisperlive(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
+    cfg = AppConfig()
+    cfg.stt.backend = STTBackend.WHISPERLIVE
+    orch = Orchestrator(cfg)
     assert isinstance(orch._stt, WhisperliveAdapter)
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 def test_init_tts_kokoro(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     cfg = AppConfig()
     cfg.tts.backend = TTSBackend.KOKORO
@@ -77,8 +86,8 @@ def test_init_tts_kokoro(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None
     assert isinstance(orch._tts, KokoroAdapter)
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 def test_init_tts_piper(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     cfg = AppConfig()
     cfg.tts.backend = TTSBackend.PIPER
@@ -86,8 +95,8 @@ def test_init_tts_piper(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     assert isinstance(orch._tts, PiperAdapter)
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 def test_phase_property(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     orch = Orchestrator(AppConfig())
     assert orch.phase == PipelinePhase.SENTINEL
@@ -96,8 +105,8 @@ def test_phase_property(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
 ##### SHOULD LOOP #####
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 def test_should_loop_enabled(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     cfg = AppConfig()
     cfg.conversation.enabled = True
@@ -107,8 +116,8 @@ def test_should_loop_enabled(mock_turn: MagicMock, mock_sentinel: MagicMock) -> 
     assert orch._should_loop() is True
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 def test_should_loop_disabled(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     cfg = AppConfig()
     cfg.conversation.enabled = False
@@ -116,8 +125,8 @@ def test_should_loop_disabled(mock_turn: MagicMock, mock_sentinel: MagicMock) ->
     assert orch._should_loop() is False
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 def test_should_loop_max_reached(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     cfg = AppConfig()
     cfg.conversation.enabled = True
@@ -130,8 +139,8 @@ def test_should_loop_max_reached(mock_turn: MagicMock, mock_sentinel: MagicMock)
 ##### END CONVERSATION #####
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 def test_end_conversation_resets_state(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     cfg = AppConfig()
     cfg.agent.backend = AgentBackend.GENERIC
@@ -145,8 +154,8 @@ def test_end_conversation_resets_state(mock_turn: MagicMock, mock_sentinel: Magi
     assert orch._phase == PipelinePhase.SENTINEL
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 def test_end_conversation_clears_generic_history(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     cfg = AppConfig()
     cfg.agent.backend = AgentBackend.GENERIC
@@ -162,8 +171,8 @@ def test_end_conversation_clears_generic_history(mock_turn: MagicMock, mock_sent
 ##### STOP #####
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 async def test_stop(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     orch = Orchestrator(AppConfig())
     orch._sentinel.stop = AsyncMock()
@@ -180,8 +189,8 @@ async def test_stop(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
 ##### ENSURE AGENT #####
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 async def test_ensure_agent_connected(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     orch = Orchestrator(AppConfig())
     orch._agent = AsyncMock()
@@ -190,8 +199,8 @@ async def test_ensure_agent_connected(mock_turn: MagicMock, mock_sentinel: Magic
     assert await orch._ensure_agent() is True
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 async def test_ensure_agent_reconnects(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     orch = Orchestrator(AppConfig())
     orch._agent = AsyncMock()
@@ -203,8 +212,8 @@ async def test_ensure_agent_reconnects(mock_turn: MagicMock, mock_sentinel: Magi
     assert await orch._ensure_agent() is True
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 async def test_ensure_agent_reconnect_fails(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     orch = Orchestrator(AppConfig())
     orch._agent = AsyncMock()
@@ -219,8 +228,8 @@ async def test_ensure_agent_reconnect_fails(mock_turn: MagicMock, mock_sentinel:
 ##### SHUTDOWN #####
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 async def test_shutdown_closes_all(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     orch = Orchestrator(AppConfig())
     orch._audio = AsyncMock()
@@ -237,8 +246,8 @@ async def test_shutdown_closes_all(mock_turn: MagicMock, mock_sentinel: MagicMoc
 ##### RUN SENTINEL #####
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 async def test_run_sentinel_transitions_to_turn(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     orch = Orchestrator(AppConfig())
     orch._sentinel.run = AsyncMock()
@@ -250,8 +259,8 @@ async def test_run_sentinel_transitions_to_turn(mock_turn: MagicMock, mock_senti
     assert orch._phase == PipelinePhase.TURN
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 async def test_run_sentinel_stays_if_no_event(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     orch = Orchestrator(AppConfig())
     orch._sentinel.run = AsyncMock()
@@ -266,8 +275,8 @@ async def test_run_sentinel_stays_if_no_event(mock_turn: MagicMock, mock_sentine
 ##### RUN TURN #####
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 async def test_run_turn_complete_loops(mock_turn_cls: MagicMock, mock_sentinel: MagicMock) -> None:
     cfg = AppConfig()
     cfg.conversation.enabled = True
@@ -285,8 +294,8 @@ async def test_run_turn_complete_loops(mock_turn_cls: MagicMock, mock_sentinel: 
     assert orch._conversation_turns == 1
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 async def test_run_turn_error_ends_conversation(mock_turn_cls: MagicMock, mock_sentinel: MagicMock) -> None:
     orch = Orchestrator(AppConfig())
     orch._agent = AsyncMock()
@@ -302,8 +311,8 @@ async def test_run_turn_error_ends_conversation(mock_turn_cls: MagicMock, mock_s
     assert orch._conversation_turns == 0
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 async def test_run_turn_agent_disconnected_ends(mock_turn_cls: MagicMock, mock_sentinel: MagicMock) -> None:
     orch = Orchestrator(AppConfig())
     orch._agent = AsyncMock()
@@ -317,8 +326,8 @@ async def test_run_turn_agent_disconnected_ends(mock_turn_cls: MagicMock, mock_s
     assert orch._phase == PipelinePhase.SENTINEL
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 async def test_run_turn_complete_no_loop(mock_turn_cls: MagicMock, mock_sentinel: MagicMock) -> None:
     cfg = AppConfig()
     cfg.conversation.enabled = False
@@ -335,8 +344,8 @@ async def test_run_turn_complete_no_loop(mock_turn_cls: MagicMock, mock_sentinel
     assert orch._phase == PipelinePhase.SENTINEL
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 async def test_run_turn_timeout(mock_turn_cls: MagicMock, mock_sentinel: MagicMock) -> None:
     import asyncio
 
@@ -363,8 +372,8 @@ async def test_run_turn_timeout(mock_turn_cls: MagicMock, mock_sentinel: MagicMo
 ##### CONVERSATION LOOP #####
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 async def test_run_conversation_loop_voice_detected(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     orch = Orchestrator(AppConfig())
     orch._sentinel.wait_for_voice = AsyncMock(return_value=True)
@@ -376,8 +385,8 @@ async def test_run_conversation_loop_voice_detected(mock_turn: MagicMock, mock_s
     assert orch._phase == PipelinePhase.TURN
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 async def test_run_conversation_loop_timeout(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     orch = Orchestrator(AppConfig())
     orch._sentinel.wait_for_voice = AsyncMock(return_value=False)
@@ -392,8 +401,8 @@ async def test_run_conversation_loop_timeout(mock_turn: MagicMock, mock_sentinel
 ##### FACTORY ERRORS #####
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 def test_create_stt_unsupported_raises(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     cfg = AppConfig()
     cfg.stt.backend = "unsupported"  # type: ignore[assignment]
@@ -401,8 +410,8 @@ def test_create_stt_unsupported_raises(mock_turn: MagicMock, mock_sentinel: Magi
         Orchestrator(cfg)
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 def test_create_tts_unsupported_raises(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     cfg = AppConfig()
     cfg.tts.backend = "unsupported"  # type: ignore[assignment]
@@ -410,8 +419,8 @@ def test_create_tts_unsupported_raises(mock_turn: MagicMock, mock_sentinel: Magi
         Orchestrator(cfg)
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 def test_create_agent_unsupported_raises(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     cfg = AppConfig()
     cfg.agent.backend = "unsupported"  # type: ignore[assignment]
@@ -422,8 +431,8 @@ def test_create_agent_unsupported_raises(mock_turn: MagicMock, mock_sentinel: Ma
 ##### RUN LOOP #####
 
 
-@patch("e_clawhisper.daemon.orchestrator.SentinelPipeline")
-@patch("e_clawhisper.daemon.orchestrator.TurnPipeline")
+@patch("e_heed.daemon.orchestrator.SentinelPipeline")
+@patch("e_heed.daemon.orchestrator.TurnPipeline")
 async def test_run_loop_dispatches_phases(mock_turn: MagicMock, mock_sentinel: MagicMock) -> None:
     orch = Orchestrator(AppConfig())
     orch._running = True

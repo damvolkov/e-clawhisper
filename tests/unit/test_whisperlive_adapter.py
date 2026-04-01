@@ -10,9 +10,8 @@ import orjson
 import pytest
 import websockets
 
-from e_clawhisper.daemon.adapters.stt.whisperlive import WhisperliveAdapter
-from e_clawhisper.shared.settings import WhisperLiveConfig
-
+from e_heed.daemon.adapters.stt.whisperlive import WhisperliveAdapter
+from e_heed.shared.settings import WhisperLiveConfig
 
 ##### INIT #####
 

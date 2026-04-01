@@ -5,12 +5,10 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from pydantic_ai.models.google import GoogleModel
 
-from e_clawhisper.daemon.adapters.agent.generic import GenericAdapter, _build_model
-from e_clawhisper.shared.settings import GenericLLMConfig, LLMProvider
-
+from e_heed.daemon.adapters.agent.generic import GenericAdapter, _build_model
+from e_heed.shared.settings import GenericLLMConfig, LLMProvider
 
 ##### BUILD MODEL #####
 
@@ -39,8 +37,8 @@ def test_build_model_anthropic_default() -> None:
     assert "claude" in result
 
 
-@patch("e_clawhisper.daemon.adapters.agent.generic.OpenAIProvider")
-@patch("e_clawhisper.daemon.adapters.agent.generic.OpenAIChatModel")
+@patch("e_heed.daemon.adapters.agent.generic.OpenAIProvider")
+@patch("e_heed.daemon.adapters.agent.generic.OpenAIChatModel")
 def test_build_model_vllm(mock_chat: MagicMock, mock_provider: MagicMock) -> None:
     cfg = GenericLLMConfig(
         provider=LLMProvider.VLLM,
@@ -55,8 +53,8 @@ def test_build_model_vllm(mock_chat: MagicMock, mock_provider: MagicMock) -> Non
     mock_chat.assert_called_once_with("mistral-7b", provider=mock_provider.return_value)
 
 
-@patch("e_clawhisper.daemon.adapters.agent.generic.OpenAIProvider")
-@patch("e_clawhisper.daemon.adapters.agent.generic.OpenAIChatModel")
+@patch("e_heed.daemon.adapters.agent.generic.OpenAIProvider")
+@patch("e_heed.daemon.adapters.agent.generic.OpenAIChatModel")
 def test_build_model_vllm_no_key(mock_chat: MagicMock, mock_provider: MagicMock) -> None:
     cfg = GenericLLMConfig(provider=LLMProvider.VLLM, model="llama")
     _build_model(cfg)
@@ -77,7 +75,7 @@ def test_adapter_init() -> None:
 ##### CONNECT / DISCONNECT #####
 
 
-@patch("e_clawhisper.daemon.adapters.agent.generic.Agent")
+@patch("e_heed.daemon.adapters.agent.generic.Agent")
 async def test_connect_creates_agent(mock_agent_cls: MagicMock) -> None:
     cfg = GenericLLMConfig(provider=LLMProvider.GEMINI, model="gemini-2.0-flash")
     adapter = GenericAdapter(cfg)
@@ -89,7 +87,7 @@ async def test_connect_creates_agent(mock_agent_cls: MagicMock) -> None:
     mock_agent_cls.assert_called_once()
 
 
-@patch("e_clawhisper.daemon.adapters.agent.generic.Agent")
+@patch("e_heed.daemon.adapters.agent.generic.Agent")
 async def test_disconnect_clears_state(mock_agent_cls: MagicMock) -> None:
     cfg = GenericLLMConfig()
     adapter = GenericAdapter(cfg)
@@ -117,7 +115,7 @@ async def test_send_raises_without_connection() -> None:
 ##### CLEAR HISTORY #####
 
 
-@patch("e_clawhisper.daemon.adapters.agent.generic.Agent")
+@patch("e_heed.daemon.adapters.agent.generic.Agent")
 async def test_clear_history(mock_agent_cls: MagicMock) -> None:
     adapter = GenericAdapter(GenericLLMConfig())
     await adapter.connect("x")
@@ -140,7 +138,7 @@ async def test_resolve_agent_id() -> None:
 ##### SEND WITH AGENT #####
 
 
-@patch("e_clawhisper.daemon.adapters.agent.generic.Agent")
+@patch("e_heed.daemon.adapters.agent.generic.Agent")
 async def test_send_yields_streamed_text(mock_agent_cls: MagicMock) -> None:
     adapter = GenericAdapter(GenericLLMConfig())
     await adapter.connect("test-id")

@@ -2,7 +2,7 @@ language: es
 
 agent:
   name: damien
-  backend: openfang  # openfang | generic
+  backend: generic  # openfang | generic
 
 sentinel:
   energy_floor: 0.01
@@ -32,13 +32,22 @@ backends:
     url: http://localhost:45100  # vllm only
 
 stt:
-  backend: whisperlive
+  backend: evoice  # evoice | whisperlive
+  evoice:
+    url: http://localhost:45140
+    language: es
   whisperlive:
     url: ws://localhost:45120
     model: large-v3-turbo
 
 tts:
-  backend: kokoro
+  backend: evoice  # evoice | kokoro | piper
+  evoice:
+    url: http://localhost:45140
+    voice: af_heart
+    speed: 1.0
+    lang: en-us
+    sample_rate: 24000
   kokoro:
     url: http://localhost:45130
     voice: em_alex

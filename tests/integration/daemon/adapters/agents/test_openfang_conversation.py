@@ -11,8 +11,8 @@ import asyncio
 import httpx
 import pytest
 
-from e_clawhisper.daemon.adapters.agent.openfang import OpenfangAdapter
-from e_clawhisper.shared.settings import OpenFangConfig
+from e_heed.daemon.adapters.agent.openfang import OpenfangAdapter
+from e_heed.shared.settings import OpenFangConfig
 
 _CONFIG = OpenFangConfig(url="http://127.0.0.1:4200", timeout=30.0)
 _AGENT_NAME = "damien"

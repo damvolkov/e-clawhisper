@@ -8,8 +8,8 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from e_clawhisper.daemon.turn.vad import EndOfSpeechDetector, EndOfSpeechResult
-from e_clawhisper.shared.settings import VADConfig
+from e_heed.daemon.turn.vad import EndOfSpeechDetector, EndOfSpeechResult
+from e_heed.shared.settings import VADConfig
 
 _WINDOW = 512
 _SR = 16000
@@ -70,7 +70,7 @@ def _make_detector(
     cfg = config or _make_config()
     probs = iter(probabilities) if probabilities else iter([])
 
-    with patch("e_clawhisper.daemon.turn.vad.SileroVAD"):
+    with patch("e_heed.daemon.turn.vad.SileroVAD"):
         detector = EndOfSpeechDetector(cfg, sample_rate=_SR)
         detector._vad = _StubVAD(threshold=cfg.threshold, probs=probs)
         return detector
@@ -126,10 +126,10 @@ def test_should_stop_requires_speech_then_silence(monkeypatch: pytest.MonkeyPatc
     probs = [0.9] + [0.1] * max_sil
     detector = _make_detector(config=cfg, probabilities=probs)
 
-    monkeypatch.setattr("e_clawhisper.daemon.turn.vad.time.monotonic", lambda: 100.0)
+    monkeypatch.setattr("e_heed.daemon.turn.vad.time.monotonic", lambda: 100.0)
     detector.process(_speech())
 
-    monkeypatch.setattr("e_clawhisper.daemon.turn.vad.time.monotonic", lambda: 101.0)
+    monkeypatch.setattr("e_heed.daemon.turn.vad.time.monotonic", lambda: 101.0)
     result = EndOfSpeechResult(is_speech=False, should_stop=False, probability=0.0)
     for _ in range(max_sil):
         result = detector.process(_silence())
@@ -149,10 +149,10 @@ def test_min_recording_time_blocks_early_stop(monkeypatch: pytest.MonkeyPatch) -
     cfg = _make_config(silence_duration=0.032, min_recording_time=2.0)
     detector = _make_detector(config=cfg, probabilities=[0.9, 0.1])
 
-    monkeypatch.setattr("e_clawhisper.daemon.turn.vad.time.monotonic", lambda: 100.0)
+    monkeypatch.setattr("e_heed.daemon.turn.vad.time.monotonic", lambda: 100.0)
     detector.process(_speech())
 
-    monkeypatch.setattr("e_clawhisper.daemon.turn.vad.time.monotonic", lambda: 100.5)
+    monkeypatch.setattr("e_heed.daemon.turn.vad.time.monotonic", lambda: 100.5)
     result = detector.process(_silence())
     assert not result.should_stop
 
@@ -161,10 +161,10 @@ def test_min_recording_time_allows_stop_after_elapsed(monkeypatch: pytest.Monkey
     cfg = _make_config(silence_duration=0.032, min_recording_time=1.0)
     detector = _make_detector(config=cfg, probabilities=[0.9, 0.1])
 
-    monkeypatch.setattr("e_clawhisper.daemon.turn.vad.time.monotonic", lambda: 100.0)
+    monkeypatch.setattr("e_heed.daemon.turn.vad.time.monotonic", lambda: 100.0)
     detector.process(_speech())
 
-    monkeypatch.setattr("e_clawhisper.daemon.turn.vad.time.monotonic", lambda: 101.5)
+    monkeypatch.setattr("e_heed.daemon.turn.vad.time.monotonic", lambda: 101.5)
     result = detector.process(_silence())
     assert result.should_stop
 

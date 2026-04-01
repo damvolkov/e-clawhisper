@@ -8,9 +8,8 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from e_clawhisper.daemon.sentinel.wakeword import WakeWordDetector, _resolve_model_path
-from e_clawhisper.shared.operational.exceptions import ModelNotFoundError
-
+from e_heed.daemon.sentinel.wakeword import WakeWordDetector, _resolve_model_path
+from e_heed.shared.operational.exceptions import ModelNotFoundError
 
 ##### MODEL RESOLUTION #####
 
@@ -21,12 +20,12 @@ def test_resolve_local_model(tmp_path: Path) -> None:
     model = ww_dir / "alexa.onnx"
     model.write_bytes(b"fake")
 
-    with patch("e_clawhisper.daemon.sentinel.wakeword._MODELS_DIR", ww_dir):
+    with patch("e_heed.daemon.sentinel.wakeword._MODELS_DIR", ww_dir):
         result = _resolve_model_path("alexa")
     assert result == model
 
 
-@patch("e_clawhisper.daemon.sentinel.wakeword.openwakeword.get_pretrained_model_paths")
+@patch("e_heed.daemon.sentinel.wakeword.openwakeword.get_pretrained_model_paths")
 def test_resolve_from_pretrained(mock_pretrained: MagicMock, tmp_path: Path) -> None:
     ww_dir = tmp_path / "ww"
 
@@ -36,17 +35,17 @@ def test_resolve_from_pretrained(mock_pretrained: MagicMock, tmp_path: Path) -> 
 
     mock_pretrained.return_value = [str(pretrained_path)]
 
-    with patch("e_clawhisper.daemon.sentinel.wakeword._MODELS_DIR", ww_dir):
+    with patch("e_heed.daemon.sentinel.wakeword._MODELS_DIR", ww_dir):
         result = _resolve_model_path("alexa")
     assert result.exists()
     assert result == ww_dir / "alexa.onnx"
 
 
-@patch("e_clawhisper.daemon.sentinel.wakeword.openwakeword.get_pretrained_model_paths")
+@patch("e_heed.daemon.sentinel.wakeword.openwakeword.get_pretrained_model_paths")
 def test_resolve_not_found(mock_pretrained: MagicMock, tmp_path: Path) -> None:
     mock_pretrained.return_value = ["/fake/other_model_v0.1.onnx"]
 
-    with patch("e_clawhisper.daemon.sentinel.wakeword._MODELS_DIR", tmp_path / "ww"):
+    with patch("e_heed.daemon.sentinel.wakeword._MODELS_DIR", tmp_path / "ww"):
         with pytest.raises(ModelNotFoundError, match="not found"):
             _resolve_model_path("nonexistent")
 
@@ -54,8 +53,8 @@ def test_resolve_not_found(mock_pretrained: MagicMock, tmp_path: Path) -> None:
 ##### DETECTOR (MOCKED OWW) #####
 
 
-@patch("e_clawhisper.daemon.sentinel.wakeword._resolve_model_path")
-@patch("e_clawhisper.daemon.sentinel.wakeword.Model")
+@patch("e_heed.daemon.sentinel.wakeword._resolve_model_path")
+@patch("e_heed.daemon.sentinel.wakeword.Model")
 def test_detector_init(mock_model_cls: MagicMock, mock_resolve: MagicMock, tmp_path: Path) -> None:
     mock_resolve.return_value = tmp_path / "alexa.onnx"
     detector = WakeWordDetector(model_name="alexa", threshold=0.6)
@@ -64,8 +63,8 @@ def test_detector_init(mock_model_cls: MagicMock, mock_resolve: MagicMock, tmp_p
     mock_model_cls.assert_called_once()
 
 
-@patch("e_clawhisper.daemon.sentinel.wakeword._resolve_model_path")
-@patch("e_clawhisper.daemon.sentinel.wakeword.Model")
+@patch("e_heed.daemon.sentinel.wakeword._resolve_model_path")
+@patch("e_heed.daemon.sentinel.wakeword.Model")
 def test_detector_feed(mock_model_cls: MagicMock, mock_resolve: MagicMock, tmp_path: Path) -> None:
     mock_resolve.return_value = tmp_path / "alexa.onnx"
     mock_model = MagicMock()
@@ -78,8 +77,8 @@ def test_detector_feed(mock_model_cls: MagicMock, mock_resolve: MagicMock, tmp_p
     mock_model.predict.assert_called_once()
 
 
-@patch("e_clawhisper.daemon.sentinel.wakeword._resolve_model_path")
-@patch("e_clawhisper.daemon.sentinel.wakeword.Model")
+@patch("e_heed.daemon.sentinel.wakeword._resolve_model_path")
+@patch("e_heed.daemon.sentinel.wakeword.Model")
 def test_detector_detect_above_threshold(mock_model_cls: MagicMock, mock_resolve: MagicMock, tmp_path: Path) -> None:
     mock_resolve.return_value = tmp_path / "alexa.onnx"
     mock_model = MagicMock()
@@ -92,8 +91,8 @@ def test_detector_detect_above_threshold(mock_model_cls: MagicMock, mock_resolve
     assert score == pytest.approx(0.8)
 
 
-@patch("e_clawhisper.daemon.sentinel.wakeword._resolve_model_path")
-@patch("e_clawhisper.daemon.sentinel.wakeword.Model")
+@patch("e_heed.daemon.sentinel.wakeword._resolve_model_path")
+@patch("e_heed.daemon.sentinel.wakeword.Model")
 def test_detector_detect_below_threshold(mock_model_cls: MagicMock, mock_resolve: MagicMock, tmp_path: Path) -> None:
     mock_resolve.return_value = tmp_path / "alexa.onnx"
     mock_model = MagicMock()
@@ -105,8 +104,8 @@ def test_detector_detect_below_threshold(mock_model_cls: MagicMock, mock_resolve
     assert detected is False
 
 
-@patch("e_clawhisper.daemon.sentinel.wakeword._resolve_model_path")
-@patch("e_clawhisper.daemon.sentinel.wakeword.Model")
+@patch("e_heed.daemon.sentinel.wakeword._resolve_model_path")
+@patch("e_heed.daemon.sentinel.wakeword.Model")
 def test_detector_feed_empty_prediction(mock_model_cls: MagicMock, mock_resolve: MagicMock, tmp_path: Path) -> None:
     mock_resolve.return_value = tmp_path / "alexa.onnx"
     mock_model = MagicMock()
@@ -118,8 +117,8 @@ def test_detector_feed_empty_prediction(mock_model_cls: MagicMock, mock_resolve:
     assert score == 0.0
 
 
-@patch("e_clawhisper.daemon.sentinel.wakeword._resolve_model_path")
-@patch("e_clawhisper.daemon.sentinel.wakeword.Model")
+@patch("e_heed.daemon.sentinel.wakeword._resolve_model_path")
+@patch("e_heed.daemon.sentinel.wakeword.Model")
 def test_detector_reset(mock_model_cls: MagicMock, mock_resolve: MagicMock, tmp_path: Path) -> None:
     mock_resolve.return_value = tmp_path / "alexa.onnx"
     mock_model = MagicMock()
@@ -130,8 +129,8 @@ def test_detector_reset(mock_model_cls: MagicMock, mock_resolve: MagicMock, tmp_
     mock_model.reset.assert_called_once()
 
 
-@patch("e_clawhisper.daemon.sentinel.wakeword._resolve_model_path")
-@patch("e_clawhisper.daemon.sentinel.wakeword.Model")
+@patch("e_heed.daemon.sentinel.wakeword._resolve_model_path")
+@patch("e_heed.daemon.sentinel.wakeword.Model")
 def test_detector_feed_converts_to_int16(mock_model_cls: MagicMock, mock_resolve: MagicMock, tmp_path: Path) -> None:
     mock_resolve.return_value = tmp_path / "alexa.onnx"
     mock_model = MagicMock()

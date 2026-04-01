@@ -1,5 +1,5 @@
 # =============================================================================
-# e-clawhisper Dockerfile
+# e-heed Dockerfile
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -62,4 +62,4 @@ ENV PYTHONPATH="/app/src"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-CMD ["eclaw", "session", "start"]
+CMD ["eheed", "run"]

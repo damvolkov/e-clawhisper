@@ -11,10 +11,10 @@ import asyncio
 import contextlib
 import sys
 
-from e_clawhisper.daemon.adapters.audio import AudioAdapter
-from e_clawhisper.daemon.sentinel.pipeline import SentinelPipeline
-from e_clawhisper.shared.logger import configure_logging, logger
-from e_clawhisper.shared.settings import load_config
+from e_heed.daemon.adapters.audio import AudioAdapter
+from e_heed.daemon.sentinel.pipeline import SentinelPipeline
+from e_heed.shared.logger import configure_logging, logger
+from e_heed.shared.settings import load_config
 
 
 async def _run(model_override: str | None = None) -> None:

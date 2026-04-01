@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import time
 from unittest.mock import MagicMock, patch
 
-from e_clawhisper.shared.logger import PipelineLogger, PipelineRenderer, configure_logging
-
+from e_heed.shared.logger import PipelineLogger, PipelineRenderer, configure_logging
 
 ##### RENDERER COLOR DISPATCH #####
 
@@ -200,9 +198,9 @@ def test_truncate_exact_limit() -> None:
 ##### CONFIGURE LOGGING #####
 
 
-@patch("e_clawhisper.shared.logger.structlog.configure")
-@patch("e_clawhisper.shared.logger.logging.basicConfig")
-@patch("e_clawhisper.shared.logger.logging.getLogger")
+@patch("e_heed.shared.logger.structlog.configure")
+@patch("e_heed.shared.logger.logging.basicConfig")
+@patch("e_heed.shared.logger.logging.getLogger")
 def test_configure_logging(mock_get: MagicMock, mock_basic: MagicMock, mock_conf: MagicMock) -> None:
     configure_logging("debug", idle_interval=0.5, turn_interval=0.1)
     mock_conf.assert_called_once()

@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from e_clawhisper.daemon.adapters.base import AgentPort, STTPort, TTSPort
-from e_clawhisper.daemon.turn.pipeline import _SENTENCE_RE, TurnPipeline
-from e_clawhisper.shared.settings import VADConfig
+from e_heed.daemon.adapters.base import AgentPort, STTPort, TTSPort
+from e_heed.daemon.turn.pipeline import _SENTENCE_RE, TurnPipeline
+from e_heed.shared.settings import VADConfig
 
 ##### REGEX SPLITS #####
 

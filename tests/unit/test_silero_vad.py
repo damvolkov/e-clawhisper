@@ -8,14 +8,13 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from e_clawhisper.daemon.sentinel.vad import SileroVAD, _resolve_model_path
-from e_clawhisper.shared.operational.exceptions import ModelNotFoundError
-
+from e_heed.daemon.sentinel.vad import SileroVAD, _resolve_model_path
+from e_heed.shared.operational.exceptions import ModelNotFoundError
 
 ##### MODEL RESOLUTION #####
 
 
-@patch("e_clawhisper.daemon.sentinel.vad.settings")
+@patch("e_heed.daemon.sentinel.vad.settings")
 def test_resolve_local_model(mock_settings: MagicMock, tmp_path: Path) -> None:
     model_dir = tmp_path / "vad"
     model_dir.mkdir()
@@ -29,7 +28,7 @@ def test_resolve_local_model(mock_settings: MagicMock, tmp_path: Path) -> None:
     assert result == model_file
 
 
-@patch("e_clawhisper.daemon.sentinel.vad.settings")
+@patch("e_heed.daemon.sentinel.vad.settings")
 def test_resolve_fallback_to_root(mock_settings: MagicMock, tmp_path: Path) -> None:
     models_dir = tmp_path / "models"
     models_dir.mkdir()
@@ -44,8 +43,8 @@ def test_resolve_fallback_to_root(mock_settings: MagicMock, tmp_path: Path) -> N
     assert result == models_dir / "vad" / "silero_vad.onnx"
 
 
-@patch("e_clawhisper.daemon.sentinel.vad.importlib.util.find_spec", return_value=None)
-@patch("e_clawhisper.daemon.sentinel.vad.settings")
+@patch("e_heed.daemon.sentinel.vad.importlib.util.find_spec", return_value=None)
+@patch("e_heed.daemon.sentinel.vad.settings")
 def test_resolve_raises_when_not_found(mock_settings: MagicMock, _mock_spec: MagicMock, tmp_path: Path) -> None:
     mock_settings.MODELS_DIR = tmp_path / "models"
     mock_settings.BASE_DIR = tmp_path
@@ -54,8 +53,8 @@ def test_resolve_raises_when_not_found(mock_settings: MagicMock, _mock_spec: Mag
         _resolve_model_path()
 
 
-@patch("e_clawhisper.daemon.sentinel.vad.settings")
-@patch("e_clawhisper.daemon.sentinel.vad.importlib.util.find_spec")
+@patch("e_heed.daemon.sentinel.vad.settings")
+@patch("e_heed.daemon.sentinel.vad.importlib.util.find_spec")
 def test_resolve_from_package(mock_find: MagicMock, mock_settings: MagicMock, tmp_path: Path) -> None:
     models_dir = tmp_path / "models"
     models_dir.mkdir()
@@ -80,8 +79,8 @@ def test_resolve_from_package(mock_find: MagicMock, mock_settings: MagicMock, tm
 ##### SILERO VAD (mocked ONNX) #####
 
 
-@patch("e_clawhisper.daemon.sentinel.vad._resolve_model_path")
-@patch("e_clawhisper.daemon.sentinel.vad.onnxruntime.InferenceSession")
+@patch("e_heed.daemon.sentinel.vad._resolve_model_path")
+@patch("e_heed.daemon.sentinel.vad.onnxruntime.InferenceSession")
 def test_vad_init(mock_session_cls: MagicMock, mock_resolve: MagicMock, tmp_path: Path) -> None:
     mock_resolve.return_value = tmp_path / "model.onnx"
     mock_session = MagicMock()
@@ -91,8 +90,8 @@ def test_vad_init(mock_session_cls: MagicMock, mock_resolve: MagicMock, tmp_path
     assert vad.threshold == 0.6
 
 
-@patch("e_clawhisper.daemon.sentinel.vad._resolve_model_path")
-@patch("e_clawhisper.daemon.sentinel.vad.onnxruntime.InferenceSession")
+@patch("e_heed.daemon.sentinel.vad._resolve_model_path")
+@patch("e_heed.daemon.sentinel.vad.onnxruntime.InferenceSession")
 def test_vad_call_returns_float(mock_session_cls: MagicMock, mock_resolve: MagicMock, tmp_path: Path) -> None:
     mock_resolve.return_value = tmp_path / "model.onnx"
     mock_session = MagicMock()
@@ -104,8 +103,8 @@ def test_vad_call_returns_float(mock_session_cls: MagicMock, mock_resolve: Magic
     assert prob == pytest.approx(0.75)
 
 
-@patch("e_clawhisper.daemon.sentinel.vad._resolve_model_path")
-@patch("e_clawhisper.daemon.sentinel.vad.onnxruntime.InferenceSession")
+@patch("e_heed.daemon.sentinel.vad._resolve_model_path")
+@patch("e_heed.daemon.sentinel.vad.onnxruntime.InferenceSession")
 def test_vad_is_voice(mock_session_cls: MagicMock, mock_resolve: MagicMock, tmp_path: Path) -> None:
     mock_resolve.return_value = tmp_path / "model.onnx"
     mock_session = MagicMock()
@@ -118,8 +117,8 @@ def test_vad_is_voice(mock_session_cls: MagicMock, mock_resolve: MagicMock, tmp_
     assert prob == pytest.approx(0.75)
 
 
-@patch("e_clawhisper.daemon.sentinel.vad._resolve_model_path")
-@patch("e_clawhisper.daemon.sentinel.vad.onnxruntime.InferenceSession")
+@patch("e_heed.daemon.sentinel.vad._resolve_model_path")
+@patch("e_heed.daemon.sentinel.vad.onnxruntime.InferenceSession")
 def test_vad_is_voice_below_threshold(mock_session_cls: MagicMock, mock_resolve: MagicMock, tmp_path: Path) -> None:
     mock_resolve.return_value = tmp_path / "model.onnx"
     mock_session = MagicMock()
@@ -132,8 +131,8 @@ def test_vad_is_voice_below_threshold(mock_session_cls: MagicMock, mock_resolve:
     assert prob == pytest.approx(0.3)
 
 
-@patch("e_clawhisper.daemon.sentinel.vad._resolve_model_path")
-@patch("e_clawhisper.daemon.sentinel.vad.onnxruntime.InferenceSession")
+@patch("e_heed.daemon.sentinel.vad._resolve_model_path")
+@patch("e_heed.daemon.sentinel.vad.onnxruntime.InferenceSession")
 def test_vad_reset_clears_state(mock_session_cls: MagicMock, mock_resolve: MagicMock, tmp_path: Path) -> None:
     mock_resolve.return_value = tmp_path / "model.onnx"
     mock_session = MagicMock()
@@ -150,8 +149,8 @@ def test_vad_reset_clears_state(mock_session_cls: MagicMock, mock_resolve: Magic
     assert np.all(vad._context == 0)
 
 
-@patch("e_clawhisper.daemon.sentinel.vad._resolve_model_path")
-@patch("e_clawhisper.daemon.sentinel.vad.onnxruntime.InferenceSession")
+@patch("e_heed.daemon.sentinel.vad._resolve_model_path")
+@patch("e_heed.daemon.sentinel.vad.onnxruntime.InferenceSession")
 def test_vad_handles_1d_and_2d_input(mock_session_cls: MagicMock, mock_resolve: MagicMock, tmp_path: Path) -> None:
     mock_resolve.return_value = tmp_path / "model.onnx"
     mock_session = MagicMock()

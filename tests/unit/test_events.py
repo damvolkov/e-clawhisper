@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from e_clawhisper.shared.operational.events import Turn, TurnComplete, TurnError, WakewordEvent
+from e_heed.shared.operational.events import Turn, TurnComplete, TurnError, WakewordEvent
 
 
 def test_wakeword_event_frozen() -> None:

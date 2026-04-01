@@ -12,9 +12,9 @@ import asyncio
 import numpy as np
 import pytest
 
-from e_clawhisper.daemon.adapters.stt.whisperlive import WhisperliveAdapter
-from e_clawhisper.daemon.adapters.tts.piper import PiperAdapter
-from e_clawhisper.shared.settings import PiperConfig, WhisperLiveConfig
+from e_heed.daemon.adapters.stt.whisperlive import WhisperliveAdapter
+from e_heed.daemon.adapters.tts.piper import PiperAdapter
+from e_heed.shared.settings import PiperConfig, WhisperLiveConfig
 
 _STT_CONFIG = WhisperLiveConfig(url="ws://localhost:9090", model="small", language="es")
 _TTS_CONFIG = PiperConfig(url="tcp://localhost:10200", sample_rate=22050)

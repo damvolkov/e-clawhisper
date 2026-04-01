@@ -1,5 +1,31 @@
 services:
 
+  evoice:
+    image: ghcr.io/damvolkov/e-voice:latest
+    container_name: evoice
+    restart: unless-stopped
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "${EVOICE_PORT:-45140}:5500"
+    volumes:
+      - ./data/evoice:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5500/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - e-core
+
+  # Legacy STT backend (WhisperLive) — optional, use with stt.backend: whisperlive
   stt:
     image: ghcr.io/collabora/whisperlive-gpu:latest
     container_name: stt
@@ -25,9 +51,12 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+    profiles:
+      - legacy
     networks:
       - e-core
 
+  # Legacy TTS backend (Kokoro) — optional, use with tts.backend: kokoro
   tts:
     image: ghcr.io/remsky/kokoro-fastapi-gpu:latest
     container_name: tts
@@ -55,6 +84,8 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+    profiles:
+      - legacy
     networks:
       - e-core
 

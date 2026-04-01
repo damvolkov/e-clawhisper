@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# e-heed CLI wrapper — sets FHS paths and delegates to the Python entry point.
+# Config resolution: $CONFIG_PATH > ~/.config/e-heed > /etc/e-heed > ./config.yaml
+set -euo pipefail
+
+export MODELS_DIR="${MODELS_DIR:-/opt/e-heed/models}"
+export DATA_DIR="${DATA_DIR:-/opt/e-heed/data}"
+export SOCKET_PATH="${SOCKET_PATH:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/e-heed/eheed.sock}"
+export PYTHONPATH="/opt/e-heed/src"
+
+exec /opt/e-heed/.venv/bin/python -m e_heed.main "$@"

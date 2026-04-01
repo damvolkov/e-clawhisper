@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from e_clawhisper.health import (
+from e_heed.health import (
     HealthChecker,
     HealthResult,
     ServiceStatus,
@@ -16,8 +16,8 @@ from e_clawhisper.health import (
     _probe_ws,
     check_services,
 )
-from e_clawhisper.shared.operational.exceptions import HealthCheckError
-from e_clawhisper.shared.settings import AppConfig, TTSBackend
+from e_heed.shared.operational.exceptions import HealthCheckError
+from e_heed.shared.settings import AppConfig, TTSBackend
 
 ##### SERVICE STATUS #####
 
@@ -62,9 +62,7 @@ def test_health_result_empty_is_healthy() -> None:
 
 
 def test_health_result_str_formatting() -> None:
-    result = HealthResult(
-        services=(ServiceStatus(name="stt", healthy=True, detail="200"),)
-    )
+    result = HealthResult(services=(ServiceStatus(name="stt", healthy=True, detail="200"),))
     assert "OK" in str(result)
     assert "stt" in str(result)
 
@@ -133,11 +131,9 @@ async def test_check_services_piper_backend() -> None:
 ##### HEALTH CHECKER RUN #####
 
 
-@patch("e_clawhisper.health.check_services")
+@patch("e_heed.health.check_services")
 async def test_health_checker_run_raises_on_failure(mock_check: AsyncMock) -> None:
-    mock_check.return_value = HealthResult(
-        services=(ServiceStatus(name="stt", healthy=False, detail="down"),)
-    )
+    mock_check.return_value = HealthResult(services=(ServiceStatus(name="stt", healthy=False, detail="down"),))
 
     checker = HealthChecker(AppConfig(), interval=0.01)
 
@@ -145,11 +141,9 @@ async def test_health_checker_run_raises_on_failure(mock_check: AsyncMock) -> No
         await checker.run(shutdown=AsyncMock())
 
 
-@patch("e_clawhisper.health.check_services")
+@patch("e_heed.health.check_services")
 async def test_health_checker_run_stops_cleanly(mock_check: AsyncMock) -> None:
-    mock_check.return_value = HealthResult(
-        services=(ServiceStatus(name="stt", healthy=True, detail="ok"),)
-    )
+    mock_check.return_value = HealthResult(services=(ServiceStatus(name="stt", healthy=True, detail="ok"),))
 
     checker = HealthChecker(AppConfig(), interval=0.01)
 

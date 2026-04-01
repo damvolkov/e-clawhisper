@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build .deb package for e-clawhisper.
+# Build .deb package for e-heed.
 # Requirements: uv, nfpm (go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest)
 set -euo pipefail
 
@@ -15,7 +15,7 @@ cd "$PROJECT_DIR"
 VERSION="$(git describe --tags --always 2>/dev/null || echo "0.0.0")"
 VERSION="${VERSION#v}"
 
-echo "==> Building e-clawhisper $VERSION ($ARCH)"
+echo "==> Building e-heed $VERSION ($ARCH)"
 
 ##### CLEAN #####
 
@@ -47,7 +47,7 @@ rsync -a --exclude='site-packages' --exclude='__pycache__' \
     "$PYTHON_HOME/lib/python3.13/" "$STAGING/.venv/lib/python3.13/"
 
 # Update pyvenv.cfg so Python finds stdlib in the venv itself
-sed -i "s|^home = .*|home = /opt/e-clawhisper/.venv/bin|" "$STAGING/.venv/pyvenv.cfg"
+sed -i "s|^home = .*|home = /opt/e-heed/.venv/bin|" "$STAGING/.venv/pyvenv.cfg"
 
 echo "==> Raw venv size: $(du -sh "$STAGING/.venv" | cut -f1)"
 

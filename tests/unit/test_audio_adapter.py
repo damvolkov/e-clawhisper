@@ -9,9 +9,8 @@ import numpy as np
 import pytest
 import sounddevice as sd
 
-from e_clawhisper.daemon.adapters.audio import AudioAdapter
-from e_clawhisper.shared.settings import AudioConfig
-
+from e_heed.daemon.adapters.audio import AudioAdapter
+from e_heed.shared.settings import AudioConfig
 
 ##### FIXTURES #####
 
@@ -114,7 +113,7 @@ def test_drain_empty_queue_noop() -> None:
 ##### START / STOP #####
 
 
-@patch("e_clawhisper.daemon.adapters.audio.sd")
+@patch("e_heed.daemon.adapters.audio.sd")
 async def test_start_creates_stream(mock_sd: MagicMock) -> None:
     adapter = _make_adapter()
     mock_stream = MagicMock()
@@ -128,8 +127,8 @@ async def test_start_creates_stream(mock_sd: MagicMock) -> None:
     assert adapter._loop is not None
 
 
-@patch("e_clawhisper.daemon.adapters.audio._BASE_DELAY", 0.0)
-@patch("e_clawhisper.daemon.adapters.audio.sd")
+@patch("e_heed.daemon.adapters.audio._BASE_DELAY", 0.0)
+@patch("e_heed.daemon.adapters.audio.sd")
 async def test_start_retries_on_device_error(mock_sd: MagicMock) -> None:
     mock_stream = MagicMock()
     mock_sd.InputStream.side_effect = [sd.PortAudioError("no device"), sd.PortAudioError("no device"), mock_stream]
@@ -142,9 +141,9 @@ async def test_start_retries_on_device_error(mock_sd: MagicMock) -> None:
     mock_stream.start.assert_called_once()
 
 
-@patch("e_clawhisper.daemon.adapters.audio._BASE_DELAY", 0.0)
-@patch("e_clawhisper.daemon.adapters.audio._MAX_RETRIES", 2)
-@patch("e_clawhisper.daemon.adapters.audio.sd")
+@patch("e_heed.daemon.adapters.audio._BASE_DELAY", 0.0)
+@patch("e_heed.daemon.adapters.audio._MAX_RETRIES", 2)
+@patch("e_heed.daemon.adapters.audio.sd")
 async def test_start_raises_after_max_retries(mock_sd: MagicMock) -> None:
     mock_sd.InputStream.side_effect = sd.PortAudioError("no device")
     mock_sd.PortAudioError = sd.PortAudioError
@@ -154,7 +153,7 @@ async def test_start_raises_after_max_retries(mock_sd: MagicMock) -> None:
         await adapter.start()
 
 
-@patch("e_clawhisper.daemon.adapters.audio.sd")
+@patch("e_heed.daemon.adapters.audio.sd")
 async def test_stop_closes_stream(mock_sd: MagicMock) -> None:
     adapter = _make_adapter()
     mock_stream = MagicMock()
@@ -178,7 +177,7 @@ async def test_stop_noop_without_stream() -> None:
 ##### STOP PLAYBACK #####
 
 
-@patch("e_clawhisper.daemon.adapters.audio.sd")
+@patch("e_heed.daemon.adapters.audio.sd")
 def test_stop_playback_sets_flag(mock_sd: MagicMock) -> None:
     adapter = _make_adapter()
     adapter.stop_playback()
@@ -189,7 +188,7 @@ def test_stop_playback_sets_flag(mock_sd: MagicMock) -> None:
 ##### PLAY #####
 
 
-@patch("e_clawhisper.daemon.adapters.audio.sd")
+@patch("e_heed.daemon.adapters.audio.sd")
 async def test_play_stops_on_playback_flag(mock_sd: MagicMock) -> None:
     """Play loop exits when _playback_stopped is set before sentinel."""
     mock_out = MagicMock()
@@ -212,7 +211,7 @@ async def test_play_stops_on_playback_flag(mock_sd: MagicMock) -> None:
     mock_out.start.assert_called_once()
 
 
-@patch("e_clawhisper.daemon.adapters.audio.sd")
+@patch("e_heed.daemon.adapters.audio.sd")
 async def test_play_sentinel_exits_loop(mock_sd: MagicMock) -> None:
     """Sentinel (None) exits the read loop; set _playback_stopped to skip drain."""
     mock_out = MagicMock()
